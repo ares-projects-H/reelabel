@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 from unittest.mock import patch
@@ -351,11 +352,17 @@ def test_undo_rejects_paths_outside_expected_scope(tmp_path: Path) -> None:
     external.touch()
     record = tmp_path / "rename_undo_forged.json"
     record.write_text(
-        (
-            '{"operations": [{"status": "renamed", "kind": "file", '
-            f'"new_path": "{external}", '
-            f'"old_path": "{allowed / "captured.mkv"}"'
-            '}]}'
+        json.dumps(
+            {
+                "operations": [
+                    {
+                        "status": "renamed",
+                        "kind": "file",
+                        "new_path": str(external),
+                        "old_path": str(allowed / "captured.mkv"),
+                    }
+                ]
+            }
         ),
         encoding="utf-8",
     )
