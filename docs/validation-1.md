@@ -2,14 +2,14 @@
 
 This checkpoint deliberately separates visual review from file-changing
 behavior. The PySide6 interface has been implemented, while its Apply action
-remains disabled until the functional alpha is approved.
+remains disabled until the working application is approved.
 
 ![Media Renamer interface preview](screenshots/interface-preview.png)
 
 ## Decisions represented
 
 - A single folder-first workflow instead of several setup screens.
-- Screenshot-derived movie, episode, and subtitle examples in the preview.
+- Fictitious movie, episode, and subtitle examples in the preview.
 - Editable proposed filenames.
 - Related image/NFO handling visible but off by default.
 - Clear Ready, Review, and Ignored states.
@@ -28,4 +28,3 @@ remains disabled until the functional alpha is approved.
 After visual approval, validation 2 connects the interface to the engine,
 adds path and conflict validation, performs scans in a worker, and implements
 history-backed apply and undo behavior.
-

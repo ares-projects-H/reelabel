@@ -24,7 +24,7 @@ native main window. Packaged builds also embed:
 
 ## Signing status
 
-Version 0.1.0 is unsigned. This is expected for the first public alpha and may
+Version 0.1.0 is unsigned. This is expected for the first public release and may
 trigger Windows SmartScreen or macOS Gatekeeper. The release provides SHA-256
 checksums and documents the warning instead of bypassing operating-system
 security.

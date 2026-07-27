@@ -1,16 +1,16 @@
 # Media Renamer
 
-Media Renamer is a safe, offline desktop utility for cleaning movie, series,
-subtitle filenames, and their containing release folders. It always previews
-proposed changes first, preserves media contents, and refuses ambiguous or
-conflicting operations.
+Media Renamer is a safe, offline desktop utility for cleaning the names of
+movie, series, and subtitle files, as well as their containing release folders.
+It always previews proposed changes first, preserves media contents, and
+refuses ambiguous or conflicting operations.
 
-> Current milestone: packaging and publication (validation 3). Version 0.1.0
-> is an unsigned public alpha, so begin with a copied test folder.
+> Current milestone: private installer testing before publication. Version
+> 0.1.0 is unsigned, so begin with a copied test folder.
 
 ## Interface preview
 
-![Media Renamer functional alpha](docs/screenshots/interface-alpha.png)
+![Media Renamer application preview](docs/screenshots/application-preview.png)
 
 Media Renamer includes:
 
@@ -18,6 +18,8 @@ Media Renamer includes:
 - movie, series, recursion, and extras options;
 - a cancellable background scan;
 - an editable before/after preview with working Ready, Review, and Ignored filters;
+- proposed names that can be edited by double-clicking a cell in the
+  **Proposed name** column;
 - editable folder-name proposals for movies, series, and other media collections;
 - optional same-folder propagation after correcting a title or season pattern
   in one episode proposal;
@@ -27,9 +29,9 @@ Media Renamer includes:
 - related image/NFO deletion shown only when requested, unchecked by default,
   and protected by a second confirmation.
 
-## Install
+## Install the app
 
-Download the package for your platform from the
+When version 0.1.0 is published, download the package for your platform from the
 [latest GitHub release](https://github.com/ares-projects-H/media-renamer/releases/latest):
 
 - Windows 10/11 x64: installer EXE;
@@ -37,10 +39,26 @@ Download the package for your platform from the
 - Linux x86_64: AppImage.
 
 The first release is unsigned, so Windows SmartScreen or macOS Gatekeeper may
-show a warning. Check the download against `SHA256SUMS.txt` and follow the
-[installation guide](docs/installation.md).
+show a warning. Before opening the download, compare it with
+`SHA256SUMS.txt`. The [step-by-step installation guide](docs/installation.md)
+explains how to do this on each system.
 
-## Run from source
+## First use
+
+1. Open Media Renamer.
+2. Drag a media folder into the window, or click **Browse**.
+3. Choose **All media**, **Movies only**, or **Series only**.
+4. Click **Preview changes**. No files are changed during this step.
+5. Review every row. Uncheck anything you do not want to rename.
+6. To correct a suggestion, double-click its cell in the **Proposed name**
+   column, type the new name, and press Enter.
+7. Click **Apply selected changes** only when the preview is correct.
+8. To restore the previous names, open **History / Undo**.
+
+## Run from source for development
+
+You do not need this section to use an installer. It is intended for people who
+want to modify the source code.
 
 ```bash
 python -m venv .venv
@@ -53,9 +71,10 @@ On Windows, activate the environment with `.venv\Scripts\activate`.
 Only source development requires Python; packaged users do not need Python or
 Codex.
 
-## Command line
+## Optional command line
 
-The original conservative command-line workflow is retained:
+Media Renamer also provides a command-line workflow for users who prefer a
+terminal:
 
 ```bash
 media-renamer --dry-run "/path/to/media"
@@ -79,7 +98,7 @@ Related images and NFO files are never proposed unless
 ## Project checkpoints
 
 - [Validation 1 — interface prototype](docs/validation-1.md)
-- [Validation 2 — functional alpha](docs/validation-2.md)
+- [Validation 2 — working application](docs/validation-2.md)
 - [Validation 3 — installers and GitHub release](docs/validation-3.md)
 
 ## Contributing and security

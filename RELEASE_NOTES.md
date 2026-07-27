@@ -1,6 +1,6 @@
 # Media Renamer v0.1.0
 
-First public alpha release of the offline Media Renamer desktop application.
+First public release of the offline Media Renamer desktop application.
 
 ## Highlights
 

@@ -84,56 +84,56 @@ class DemoRow:
 DEMO_ROWS = (
     DemoRow(
         "Ready",
-        "Gotham.S04.1080p.x265-ZMNT",
-        "Gotham S04",
+        "Harbor.Lights.S02.1080p.x265-DEMO",
+        "Harbor Lights S02",
         "FOLDER",
     ),
     DemoRow(
         "Ready",
-        "[MagicStar] Jikou Keisatsu 2019 Fukkatsu SP WEB-DL.mkv",
-        "Jikou Keisatsu 2019 Fukkatsu SP.mkv",
+        "[SampleGroup] Midnight Library 2022 WEB-DL.mkv",
+        "Midnight Library (2022).mkv",
         "MKV",
     ),
     DemoRow(
         "Ready",
-        "Always.Sunset.on.Third.Street.2005.1080p.BluRay.x264.mkv",
-        "Always Sunset on Third Street (2005).mkv",
+        "Paper.Moons.2018.1080p.BluRay.x264.mkv",
+        "Paper Moons (2018).mkv",
         "MKV",
     ),
     DemoRow(
         "Ready",
-        "Campaign.2007.DVDRip.XviD.AC3.Glaeken.CG.avi",
-        "Campaign (2007).avi",
+        "Northbound.2020.DVDRip.XviD.AC3-DEMO.avi",
+        "Northbound (2020).avi",
         "AVI",
     ),
     DemoRow(
         "Ready",
-        "Campaign.2007.DVDRip.XviD.AC3.Glaeken.CG.idx",
-        "Campaign (2007).idx",
+        "Northbound.2020.DVDRip.XviD.AC3-DEMO.idx",
+        "Northbound (2020).idx",
         "IDX",
     ),
     DemoRow(
         "Ready",
-        "Campaign.2007.DVDRip.XviD.AC3.Glaeken.CG.sub",
-        "Campaign (2007).sub",
+        "Northbound.2020.DVDRip.XviD.AC3-DEMO.sub",
+        "Northbound (2020).sub",
         "SUB",
     ),
     DemoRow(
         "Ready",
-        "Toumei.na.Yurikago.EP01.1080p.NF.WEB-DL.DDP2.0.H.264-MagicStar.mkv",
-        "Toumei na Yurikago S01 E01.mkv",
+        "Harbor.Lights.EP01.1080p.WEB-DL.DDP2.0.H.264-DEMO.mkv",
+        "Harbor Lights S02 E01.mkv",
         "MKV",
     ),
     DemoRow(
         "Ready",
-        "Toumei.na.Yurikago.EP01.1080p.NF.WEB-DL.DDP2.0.H.264-MagicStar.ass",
-        "Toumei na Yurikago S01 E01.ass",
+        "Harbor.Lights.EP01.1080p.WEB-DL.DDP2.0.H.264-DEMO.ass",
+        "Harbor Lights S02 E01.ass",
         "ASS",
     ),
     DemoRow(
         "Review",
-        "Again - English subtitles [ATK][8680D185].mkv",
-        "Again - English Subtitles.mkv",
+        "Lost Signal - English subtitles [DEMO][1234ABCD].mkv",
+        "Lost Signal - English Subtitles.mkv",
         "MKV",
         False,
     ),
@@ -325,6 +325,10 @@ class MainWindow(QMainWindow):
             )
             self.filter_buttons[key] = button
             filter_row.addWidget(button)
+        edit_hint = QLabel("Tip: Double-click a Proposed name to edit it.")
+        edit_hint.setObjectName("muted")
+        filter_row.addSpacing(10)
+        filter_row.addWidget(edit_hint)
         filter_row.addStretch()
         self.sidecars = QCheckBox("Show related images / NFO")
         self.sidecars.setChecked(False)
@@ -344,8 +348,8 @@ class MainWindow(QMainWindow):
             QAbstractItemView.SelectionBehavior.SelectRows
         )
         self.table.setToolTip(
-            "Edit a proposed episode name to optionally update the same pattern "
-            "for other files in its folder."
+            "Double-click a Proposed name to edit it. Episode edits can "
+            "optionally update the same pattern for other files in the folder."
         )
         self.table.verticalHeader().setVisible(False)
         self.table.itemChanged.connect(self._table_item_changed)
@@ -388,7 +392,7 @@ class MainWindow(QMainWindow):
         brand.setObjectName("brand")
         history = QPushButton("History / Undo")
         history.clicked.connect(self._show_history)
-        version = QLabel("FUNCTIONAL ALPHA")
+        version = QLabel("VERSION 0.1.0")
         version.setObjectName("muted")
         header.addWidget(icon_label)
         header.addWidget(brand)

@@ -67,6 +67,17 @@ Some distributions require FUSE 2 compatibility to run AppImages.
 
 ## First safe test
 
-Copy a small media folder and use the copy for the first preview, apply, and
-History / Undo test. Related images and NFO files stay unchecked unless you
-select them explicitly.
+For your first test, copy a small media folder so the original files remain
+untouched.
+
+1. Open Media Renamer.
+2. Drag the copied folder into the window, or click **Browse**.
+3. Choose the media type and click **Preview changes**. Previewing does not
+   rename anything.
+4. Review every proposed change. Uncheck a row to exclude it.
+5. To correct a name, double-click its cell in the **Proposed name** column,
+   type the correction, and press Enter.
+6. Click **Apply selected changes** only after checking the complete preview.
+7. Open **History / Undo** and restore the operation to confirm that undo works.
+
+Related images and NFO files stay unchecked unless you select them explicitly.
