@@ -12,7 +12,7 @@ conflicting operations.
 
 ![Media Renamer functional alpha](docs/screenshots/interface-alpha.png)
 
-The functional alpha includes:
+Media Renamer includes:
 
 - folder selection and drag-and-drop;
 - movie, series, recursion, and extras options;
