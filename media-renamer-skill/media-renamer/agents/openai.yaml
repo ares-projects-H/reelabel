@@ -1,0 +1,4 @@
+interface:
+  display_name: "MediaRenamer"
+  short_description: "Renommer vidéos et sous-titres localement"
+  default_prompt: "Use $media-renamer to safely preview renaming a media folder."
