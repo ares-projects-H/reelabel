@@ -51,7 +51,7 @@ jobs:
         run: |
           & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "packaging\windows\MediaRenamer.iss"
 
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: windows-x64
           path: release/Media-Renamer-0.1.0-Windows-x64-Setup.exe
@@ -93,7 +93,7 @@ jobs:
       - name: Build DMG
         run: packaging/macos/build_dmg.sh "$VERSION" "${{ matrix.architecture }}"
 
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: macos-${{ matrix.architecture }}
           path: release/Media-Renamer-0.1.0-macOS-${{ matrix.architecture }}.dmg
@@ -147,7 +147,7 @@ jobs:
             release/Media-Renamer-0.1.0-Linux-x86_64.AppImage \
             --appimage-extract-and-run
 
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: linux-x86_64
           path: release/Media-Renamer-0.1.0-Linux-x86_64.AppImage
@@ -166,7 +166,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           path: release-assets
           merge-multiple: true
