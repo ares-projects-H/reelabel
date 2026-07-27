@@ -1,17 +1,19 @@
-"""Main window for the first Media Renamer interface validation."""
+"""Main window for the Media Renamer desktop application."""
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QObject, QStandardPaths, Qt, QThread, Signal, Slot
 from PySide6.QtGui import QDragEnterEvent, QDropEvent, QIcon, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
     QCheckBox,
     QComboBox,
+    QDialog,
     QFileDialog,
     QFrame,
     QGridLayout,
@@ -19,7 +21,10 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QLabel,
     QLineEdit,
+    QListWidget,
+    QListWidgetItem,
     QMainWindow,
+    QMessageBox,
     QPushButton,
     QSizePolicy,
     QTableWidget,
@@ -28,12 +33,38 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from media_renamer import api, core
+
 from .styles import stylesheet
+
+SOURCE_ROLE = int(Qt.ItemDataRole.UserRole)
+CATEGORY_ROLE = SOURCE_ROLE + 1
+KIND_ROLE = SOURCE_ROLE + 2
+
+REASON_TRANSLATIONS = {
+    "nom vidéo normalisé": "Normalized video filename.",
+    "sous-titre associé à la vidéo": "Subtitle matched to its video.",
+    "extra identifié (option --include-extras requise)": (
+        "Identified as an extra; enable Include extras to include it."
+    ),
+    "titre insuffisant ou ambigu": "The title is insufficient or ambiguous.",
+    "série exclue par --movies": "Series excluded by the Movies only option.",
+    "film exclu par --series": "Movie excluded by the Series only option.",
+    "sous-titre sans association certaine": (
+        "No sufficiently certain video match was found for this subtitle."
+    ),
+    "plusieurs fichiers visent la même destination": (
+        "More than one file has the same destination."
+    ),
+    "destination existante ou collision de casse": (
+        "The destination exists or differs only by letter case."
+    ),
+}
 
 
 @dataclass(frozen=True)
 class DemoRow:
-    """One representative row shown before the engine is connected."""
+    """One representative row used only for screenshots and UI tests."""
 
     status: str
     original: str
@@ -97,6 +128,7 @@ DEMO_ROWS = (
 
 def project_asset(name: str) -> Path:
     """Resolve an asset while running from the source checkout."""
+
     return Path(__file__).resolve().parents[3] / "assets" / name
 
 
@@ -135,7 +167,9 @@ class DropZone(QFrame):
 
     def dragEnterEvent(self, event: QDragEnterEvent) -> None:  # noqa: N802
         urls = event.mimeData().urls()
-        if len(urls) == 1 and urls[0].isLocalFile() and Path(urls[0].toLocalFile()).is_dir():
+        if len(urls) == 1 and urls[0].isLocalFile() and Path(
+            urls[0].toLocalFile()
+        ).is_dir():
             event.acceptProposedAction()
 
     def dropEvent(self, event: QDropEvent) -> None:  # noqa: N802
@@ -143,10 +177,36 @@ class DropZone(QFrame):
         event.acceptProposedAction()
 
 
-class MainWindow(QMainWindow):
-    """Modern, read-only prototype for validation checkpoint one."""
+class ScanWorker(QObject):
+    """Run the read-only filesystem scan away from the interface thread."""
 
-    def __init__(self, demo: bool = True) -> None:
+    completed = Signal(object)
+    failed = Signal(str)
+    cancelled = Signal()
+
+    def __init__(self, options: api.ScanOptions) -> None:
+        super().__init__()
+        self.options = options
+
+    @Slot()
+    def run(self) -> None:
+        try:
+            report = api.scan(
+                self.options,
+                cancelled=lambda: QThread.currentThread().isInterruptionRequested(),
+            )
+        except core.ScanCancelled:
+            self.cancelled.emit()
+        except Exception as exc:  # Qt must receive failures on the main thread.
+            self.failed.emit(str(exc))
+        else:
+            self.completed.emit(report)
+
+
+class MainWindow(QMainWindow):
+    """Modern interface for previewing and safely applying media renames."""
+
+    def __init__(self, demo: bool = False) -> None:
         super().__init__()
         self.setWindowTitle("Media Renamer")
         self.setMinimumSize(1040, 700)
@@ -160,9 +220,18 @@ class MainWindow(QMainWindow):
         if app is not None:
             dark = app.palette().window().color().lightness() < 145
         self.setStyleSheet(stylesheet(dark=dark))
+
+        self.current_report: api.ScanReport | None = None
+        self._scan_thread: QThread | None = None
+        self._scan_worker: ScanWorker | None = None
+        self._loading_table = False
+        self._active_filter = "all"
+        self.filter_buttons: dict[str, QPushButton] = {}
         self._build_ui()
         if demo:
             self._load_demo()
+        else:
+            self._show_empty_state()
 
     def _build_ui(self) -> None:
         root = QWidget()
@@ -210,7 +279,7 @@ class MainWindow(QMainWindow):
         self.extras = QCheckBox("Include extras")
         self.scan_button = QPushButton("Preview changes")
         self.scan_button.setObjectName("primary")
-        self.scan_button.clicked.connect(self._load_demo)
+        self.scan_button.clicked.connect(self._scan_or_cancel)
         selection.addWidget(self.path_edit, 1, 0, 1, 2)
         selection.addWidget(browse, 1, 2)
         selection.addWidget(self.media_type, 1, 3)
@@ -225,15 +294,26 @@ class MainWindow(QMainWindow):
 
         filter_row = QHBoxLayout()
         filter_row.setSpacing(6)
-        for index, text in enumerate(("All 42", "Ready 34", "Review 2", "Ignored 6")):
-            button = QPushButton(text)
+        for key, label in (
+            ("all", "All"),
+            ("ready", "Ready"),
+            ("review", "Review"),
+            ("ignored", "Ignored"),
+        ):
+            button = QPushButton(f"{label} 0")
             button.setObjectName("filter")
-            button.setProperty("active", index == 0)
+            button.setProperty("active", key == "all")
+            button.clicked.connect(
+                lambda checked=False, selected=key: self._set_filter(selected)
+            )
+            self.filter_buttons[key] = button
             filter_row.addWidget(button)
         filter_row.addStretch()
-        self.sidecars = QCheckBox("Include related images / NFO")
+        self.sidecars = QCheckBox("Show related images / NFO")
         self.sidecars.setChecked(False)
-        self.sidecars.setToolTip("Off by default. A second confirmation is always required.")
+        self.sidecars.setToolTip(
+            "Off by default. Selected related files require a second confirmation."
+        )
         filter_row.addWidget(self.sidecars)
         page.addLayout(filter_row)
 
@@ -243,8 +323,11 @@ class MainWindow(QMainWindow):
         )
         self.table.setAlternatingRowColors(True)
         self.table.setShowGrid(False)
-        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table.setSelectionBehavior(
+            QAbstractItemView.SelectionBehavior.SelectRows
+        )
         self.table.verticalHeader().setVisible(False)
+        self.table.itemChanged.connect(self._table_item_changed)
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
@@ -254,14 +337,14 @@ class MainWindow(QMainWindow):
         page.addWidget(self.table, 1)
 
         footer = QHBoxLayout()
-        notice = QLabel("✓ Prototype mode — no files can be changed")
-        notice.setObjectName("safeNotice")
-        footer.addWidget(notice)
+        self.notice = QLabel("✓ Choose a folder to create a read-only preview")
+        self.notice.setObjectName("safeNotice")
+        footer.addWidget(self.notice)
         footer.addStretch()
         self.apply_button = QPushButton("Apply selected changes")
         self.apply_button.setObjectName("primary")
         self.apply_button.setEnabled(False)
-        self.apply_button.setToolTip("Enabled only after the functional alpha is approved.")
+        self.apply_button.clicked.connect(self._apply_selected)
         footer.addWidget(self.apply_button)
         page.addLayout(footer)
 
@@ -282,11 +365,14 @@ class MainWindow(QMainWindow):
             )
         brand = QLabel("Media Renamer")
         brand.setObjectName("brand")
-        version = QLabel("INTERFACE PREVIEW")
+        history = QPushButton("History / Undo")
+        history.clicked.connect(self._show_history)
+        version = QLabel("FUNCTIONAL ALPHA")
         version.setObjectName("muted")
         header.addWidget(icon_label)
         header.addWidget(brand)
         header.addStretch()
+        header.addWidget(history)
         header.addWidget(version)
         return header
 
@@ -298,36 +384,289 @@ class MainWindow(QMainWindow):
     def _set_folder(self, folder: str) -> None:
         self.path_edit.setText(folder)
 
+    def _scan_or_cancel(self) -> None:
+        if self._scan_thread is not None and self._scan_thread.isRunning():
+            self._scan_thread.requestInterruption()
+            self.scan_button.setEnabled(False)
+            self.scan_button.setText("Cancelling…")
+            self.notice.setText("Stopping the read-only scan…")
+            return
+        self._start_scan()
+
+    def _start_scan(self) -> None:
+        folder = Path(self.path_edit.text().strip()).expanduser()
+        if not folder.is_dir():
+            QMessageBox.warning(
+                self,
+                "Choose a folder",
+                "Select an existing media folder before previewing changes.",
+            )
+            return
+        scope = (
+            api.MediaScope.ALL,
+            api.MediaScope.MOVIES,
+            api.MediaScope.SERIES,
+        )[self.media_type.currentIndex()]
+        options = api.ScanOptions(
+            folder=folder,
+            recursive=self.recursive.isChecked(),
+            media_type=scope,
+            include_extras=self.extras.isChecked(),
+            include_sidecars=self.sidecars.isChecked(),
+        )
+
+        self.current_report = None
+        self.table.setRowCount(0)
+        self.apply_button.setEnabled(False)
+        self.scan_button.setText("Cancel scan")
+        self.notice.setText("Scanning locally… no files are being changed")
+
+        thread = QThread(self)
+        worker = ScanWorker(options)
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run)
+        worker.completed.connect(self._scan_completed)
+        worker.failed.connect(self._scan_failed)
+        worker.cancelled.connect(self._scan_cancelled)
+        worker.completed.connect(thread.quit)
+        worker.failed.connect(thread.quit)
+        worker.cancelled.connect(thread.quit)
+        thread.finished.connect(worker.deleteLater)
+        thread.finished.connect(self._scan_thread_finished)
+        thread.finished.connect(thread.deleteLater)
+        self._scan_thread = thread
+        self._scan_worker = worker
+        thread.start()
+
+    @Slot(object)
+    def _scan_completed(self, report: api.ScanReport) -> None:
+        self.current_report = report
+        self._populate_report(report)
+        self.notice.setText("✓ Preview complete — no files have been changed")
+
+    @Slot(str)
+    def _scan_failed(self, message: str) -> None:
+        self.notice.setText("The scan could not be completed")
+        QMessageBox.critical(self, "Scan failed", message)
+
+    @Slot()
+    def _scan_cancelled(self) -> None:
+        self.notice.setText("Scan cancelled — no files were changed")
+
+    @Slot()
+    def _scan_thread_finished(self) -> None:
+        self._scan_thread = None
+        self._scan_worker = None
+        self.scan_button.setEnabled(True)
+        self.scan_button.setText("Preview changes")
+
+    def _populate_report(self, report: api.ScanReport) -> None:
+        self._loading_table = True
+        self.table.setRowCount(0)
+        for rename in report.renames:
+            if rename.status == "proposed":
+                self._add_row(
+                    status="Ready",
+                    original=self._relative_name(rename.source, report.options.folder),
+                    proposed=rename.destination.name,
+                    media_type=rename.source.suffix.removeprefix(".").upper(),
+                    selected=True,
+                    category="ready",
+                    kind="rename",
+                    source=rename.source,
+                    detail=self._english_reason(rename.reason),
+                )
+            else:
+                self._add_row(
+                    status="Review",
+                    original=self._relative_name(rename.source, report.options.folder),
+                    proposed=rename.destination.name,
+                    media_type=rename.source.suffix.removeprefix(".").upper(),
+                    selected=False,
+                    category="review",
+                    kind="conflict",
+                    source=rename.source,
+                    detail=self._english_reason(rename.detail),
+                )
+        for path, reason in report.ignored:
+            self._add_row(
+                status="Ignored",
+                original=self._relative_name(path, report.options.folder),
+                proposed="—",
+                media_type=path.suffix.removeprefix(".").upper(),
+                selected=False,
+                category="ignored",
+                kind="info",
+                source=path,
+                detail=self._english_reason(reason),
+            )
+        for path, media_name in report.missing_subtitles:
+            self._add_row(
+                status="Review",
+                original=self._relative_name(path, report.options.folder),
+                proposed="External subtitles not found",
+                media_type=path.suffix.removeprefix(".").upper(),
+                selected=False,
+                category="review",
+                kind="info",
+                source=path,
+                detail=f"No external subtitle matched {media_name}. MKV files are exempt.",
+            )
+        for deletion in report.sidecars:
+            self._add_row(
+                status="Related",
+                original=self._relative_name(deletion.path, report.options.folder),
+                proposed="Permanent deletion",
+                media_type=deletion.path.suffix.removeprefix(".").upper(),
+                selected=False,
+                category="review",
+                kind="sidecar",
+                source=deletion.path,
+                detail="Optional related image/NFO. Always unchecked by default.",
+            )
+        self._loading_table = False
+        self._refresh_counts()
+        self._set_filter(self._active_filter)
+        self._revalidate_table()
+
+    def _relative_name(self, path: Path, root: Path) -> str:
+        try:
+            return str(path.relative_to(root))
+        except ValueError:
+            return path.name
+
+    def _english_reason(self, reason: str) -> str:
+        """Translate the original engine's known status messages for the UI."""
+
+        return REASON_TRANSLATIONS.get(reason, reason)
+
+    def _add_row(
+        self,
+        *,
+        status: str,
+        original: str,
+        proposed: str,
+        media_type: str,
+        selected: bool,
+        category: str,
+        kind: str,
+        source: Path | None,
+        detail: str = "",
+    ) -> None:
+        row = self.table.rowCount()
+        self.table.insertRow(row)
+        include = QTableWidgetItem()
+        include.setFlags(
+            Qt.ItemFlag.ItemIsEnabled
+            | Qt.ItemFlag.ItemIsSelectable
+            | (
+                Qt.ItemFlag.ItemIsUserCheckable
+                if kind in {"rename", "sidecar"}
+                else Qt.ItemFlag.NoItemFlags
+            )
+        )
+        include.setCheckState(
+            Qt.CheckState.Checked if selected else Qt.CheckState.Unchecked
+        )
+        status_item = QTableWidgetItem(status)
+        status_item.setData(CATEGORY_ROLE, category)
+        status_item.setData(KIND_ROLE, kind)
+        status_item.setForeground(
+            Qt.GlobalColor.green
+            if status == "Ready"
+            else Qt.GlobalColor.yellow
+            if status in {"Review", "Related"}
+            else Qt.GlobalColor.gray
+        )
+        original_item = QTableWidgetItem(original)
+        original_item.setFlags(
+            original_item.flags() & ~Qt.ItemFlag.ItemIsEditable
+        )
+        original_item.setData(SOURCE_ROLE, str(source) if source else "")
+        proposed_item = QTableWidgetItem(proposed)
+        if kind != "rename":
+            proposed_item.setFlags(
+                proposed_item.flags() & ~Qt.ItemFlag.ItemIsEditable
+            )
+        type_item = QTableWidgetItem(media_type)
+        type_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        for column, item in enumerate(
+            (include, status_item, original_item, proposed_item, type_item)
+        ):
+            item.setToolTip(detail)
+            self.table.setItem(row, column, item)
+        self.table.setRowHeight(row, 42)
+
     def _load_demo(self) -> None:
-        """Populate the preview with screenshot-derived, non-destructive examples."""
+        """Populate screenshot-derived examples without scanning or changing files."""
+
+        self._loading_table = True
         if not self.path_edit.text():
             self.path_edit.setText("/Media/Library")
+        self.table.setRowCount(0)
+        for row in DEMO_ROWS:
+            category = row.status.casefold()
+            self._add_row(
+                status=row.status,
+                original=row.original,
+                proposed=row.proposed,
+                media_type=row.media_type,
+                selected=row.selected,
+                category=category,
+                kind="rename" if row.status == "Ready" else "conflict",
+                source=None,
+            )
+        self._loading_table = False
+        self._refresh_counts()
+        self._set_filter("all")
+        self.notice.setText("✓ Demo preview — no files can be changed")
+        self.apply_button.setEnabled(False)
+
+    def _show_empty_state(self) -> None:
         self._set_summary(
-            (("42", "FILES FOUND"), ("34", "READY"), ("2", "REVIEW"), ("6", "IGNORED"))
+            (("0", "FILES FOUND"), ("0", "READY"), ("0", "REVIEW"), ("0", "IGNORED"))
         )
-        self.table.setRowCount(len(DEMO_ROWS))
-        for row_index, row in enumerate(DEMO_ROWS):
-            include = QTableWidgetItem()
-            include.setFlags(
-                Qt.ItemFlag.ItemIsEnabled
-                | Qt.ItemFlag.ItemIsSelectable
-                | Qt.ItemFlag.ItemIsUserCheckable
+        self._refresh_filter_labels({"all": 0, "ready": 0, "review": 0, "ignored": 0})
+
+    def _set_filter(self, category: str) -> None:
+        """Show only rows in the clicked status category."""
+
+        self._active_filter = category
+        for key, button in self.filter_buttons.items():
+            button.setProperty("active", key == category)
+            button.style().unpolish(button)
+            button.style().polish(button)
+        for row in range(self.table.rowCount()):
+            row_category = self.table.item(row, 1).data(CATEGORY_ROLE)
+            self.table.setRowHidden(
+                row,
+                category != "all" and row_category != category,
             )
-            include.setCheckState(
-                Qt.CheckState.Checked if row.selected else Qt.CheckState.Unchecked
+
+    def _refresh_counts(self) -> None:
+        counts = {"all": self.table.rowCount(), "ready": 0, "review": 0, "ignored": 0}
+        for row in range(self.table.rowCount()):
+            category = self.table.item(row, 1).data(CATEGORY_ROLE)
+            if category in counts:
+                counts[category] += 1
+        self._refresh_filter_labels(counts)
+        self._set_summary(
+            (
+                (str(counts["all"]), "FILES FOUND"),
+                (str(counts["ready"]), "READY"),
+                (str(counts["review"]), "REVIEW"),
+                (str(counts["ignored"]), "IGNORED"),
             )
-            status = QTableWidgetItem(row.status)
-            status.setForeground(
-                Qt.GlobalColor.green if row.status == "Ready" else Qt.GlobalColor.yellow
-            )
-            original = QTableWidgetItem(row.original)
-            original.setFlags(original.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            proposed = QTableWidgetItem(row.proposed)
-            media_type = QTableWidgetItem(row.media_type)
-            media_type.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            for column, item in enumerate((include, status, original, proposed, media_type)):
-                self.table.setItem(row_index, column, item)
-            self.table.setRowHeight(row_index, 42)
+        )
+
+    def _refresh_filter_labels(self, counts: dict[str, int]) -> None:
+        for key, label in (
+            ("all", "All"),
+            ("ready", "Ready"),
+            ("review", "Review"),
+            ("ignored", "Ignored"),
+        ):
+            self.filter_buttons[key].setText(f"{label} {counts[key]}")
 
     def _set_summary(self, values: tuple[tuple[str, str], ...]) -> None:
         while self.summary_layout.count():
@@ -337,7 +676,9 @@ class MainWindow(QMainWindow):
         for value, label in values:
             card = QFrame()
             card.setObjectName("summaryCard")
-            card.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            card.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
+            )
             card_layout = QVBoxLayout(card)
             card_layout.setContentsMargins(14, 10, 14, 10)
             metric = QLabel(value)
@@ -348,3 +689,210 @@ class MainWindow(QMainWindow):
             card_layout.addWidget(metric_label)
             self.summary_layout.addWidget(card)
 
+    @Slot(QTableWidgetItem)
+    def _table_item_changed(self, item: QTableWidgetItem) -> None:
+        if self._loading_table or item.column() not in {0, 3}:
+            return
+        self._revalidate_table()
+
+    def _selected_edits(self) -> dict[Path, str]:
+        edits: dict[Path, str] = {}
+        for row in range(self.table.rowCount()):
+            status = self.table.item(row, 1)
+            if status.data(KIND_ROLE) != "rename":
+                continue
+            if self.table.item(row, 0).checkState() != Qt.CheckState.Checked:
+                continue
+            source_value = self.table.item(row, 2).data(SOURCE_ROLE)
+            if source_value:
+                edits[Path(source_value)] = self.table.item(row, 3).text()
+        return edits
+
+    def _selected_sidecars(self) -> set[Path]:
+        selected: set[Path] = set()
+        for row in range(self.table.rowCount()):
+            if self.table.item(row, 1).data(KIND_ROLE) != "sidecar":
+                continue
+            if self.table.item(row, 0).checkState() == Qt.CheckState.Checked:
+                selected.add(Path(self.table.item(row, 2).data(SOURCE_ROLE)))
+        return selected
+
+    def _revalidate_table(self) -> list[api.ValidationIssue]:
+        if self.current_report is None:
+            self.apply_button.setEnabled(False)
+            return []
+        edits = self._selected_edits()
+        issues = api.validate_edits(self.current_report, edits)
+        by_source: dict[Path, list[str]] = {}
+        for issue in issues:
+            by_source.setdefault(issue.source.resolve(), []).append(issue.message)
+
+        self._loading_table = True
+        for row in range(self.table.rowCount()):
+            status = self.table.item(row, 1)
+            if status.data(KIND_ROLE) != "rename":
+                continue
+            source = Path(self.table.item(row, 2).data(SOURCE_ROLE)).resolve()
+            messages = by_source.get(source, [])
+            status.setText("Review" if messages else "Ready")
+            status.setData(CATEGORY_ROLE, "review" if messages else "ready")
+            status.setToolTip("\n".join(messages))
+            status.setForeground(
+                Qt.GlobalColor.yellow if messages else Qt.GlobalColor.green
+            )
+        self._loading_table = False
+        self._refresh_counts()
+        self._set_filter(self._active_filter)
+        self.apply_button.setEnabled(bool(edits) and not issues)
+        self.apply_button.setToolTip(
+            "\n".join(issue.message for issue in issues[:3])
+            if issues
+            else "Apply only the checked and validated rename proposals."
+        )
+        return issues
+
+    def _history_dir(self) -> Path:
+        location = QStandardPaths.writableLocation(
+            QStandardPaths.StandardLocation.AppDataLocation
+        )
+        return Path(location) / "history"
+
+    def _apply_selected(self) -> None:
+        if self.current_report is None:
+            return
+        edits = self._selected_edits()
+        issues = self._revalidate_table()
+        if not edits or issues:
+            QMessageBox.warning(
+                self,
+                "Review the selection",
+                "Select at least one valid Ready item before applying changes.",
+            )
+            return
+        sidecars = self._selected_sidecars()
+        answer = QMessageBox.question(
+            self,
+            "Apply selected changes?",
+            f"Rename {len(edits)} file(s)?\n\n"
+            "The operation is transactional and an undo entry will be saved.",
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        if sidecars:
+            warning = QMessageBox.warning(
+                self,
+                "Permanently delete related files?",
+                f"{len(sidecars)} selected image/NFO file(s) will be permanently deleted.\n\n"
+                "These deletions cannot be restored by Undo.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Cancel,
+            )
+            if warning != QMessageBox.StandardButton.Yes:
+                return
+
+        self.apply_button.setEnabled(False)
+        self.scan_button.setEnabled(False)
+        self.notice.setText("Applying the validated transaction…")
+        try:
+            result = api.apply(
+                self.current_report,
+                edits,
+                delete_sidecars=bool(sidecars),
+                selected_sidecars=sidecars,
+                history_dir=self._history_dir(),
+            )
+        except Exception as exc:
+            QMessageBox.critical(self, "Changes were not applied", str(exc))
+            self.notice.setText("Apply failed — automatic restoration was attempted")
+            self.scan_button.setEnabled(True)
+            self._revalidate_table()
+            return
+
+        self.notice.setText(
+            f"✓ Renamed {result.renamed} file(s); an Undo entry was saved"
+        )
+        QMessageBox.information(
+            self,
+            "Changes applied",
+            f"{result.renamed} file(s) renamed successfully.\n"
+            f"History entry:\n{result.history_entry}",
+        )
+        self.scan_button.setEnabled(True)
+        self._start_scan()
+
+    def _show_history(self) -> None:
+        dialog = QDialog(self)
+        dialog.setWindowTitle("History / Undo")
+        dialog.resize(720, 420)
+        layout = QVBoxLayout(dialog)
+        explanation = QLabel(
+            "Undo restores renamed files only when doing so cannot overwrite an existing file."
+        )
+        explanation.setWordWrap(True)
+        layout.addWidget(explanation)
+        entries = QListWidget()
+        layout.addWidget(entries, 1)
+
+        for path in sorted(
+            self._history_dir().glob("rename_undo_*.json"), reverse=True
+        ):
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            count = sum(
+                item.get("status") == "renamed"
+                for item in payload.get("operations", [])
+            )
+            state = "Undone" if payload.get("undone_at") else "Available"
+            item = QListWidgetItem(
+                f"{payload.get('created_at', path.stem)} — {count} rename(s) — {state}"
+            )
+            item.setData(Qt.ItemDataRole.UserRole, str(path))
+            if state == "Undone":
+                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEnabled)
+            entries.addItem(item)
+
+        buttons = QHBoxLayout()
+        close = QPushButton("Close")
+        undo_button = QPushButton("Undo selected")
+        undo_button.setObjectName("primary")
+        buttons.addStretch()
+        buttons.addWidget(close)
+        buttons.addWidget(undo_button)
+        layout.addLayout(buttons)
+        close.clicked.connect(dialog.reject)
+
+        def restore_selected() -> None:
+            item = entries.currentItem()
+            if item is None or not item.flags() & Qt.ItemFlag.ItemIsEnabled:
+                return
+            answer = QMessageBox.question(
+                dialog,
+                "Undo this operation?",
+                "Original filenames will be restored only if every destination is safe.",
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+            result = api.undo(Path(item.data(Qt.ItemDataRole.UserRole)))
+            if result.errors:
+                QMessageBox.critical(dialog, "Undo could not run", "\n".join(result.errors))
+                return
+            QMessageBox.information(
+                dialog, "Undo complete", f"{result.restored} file(s) restored."
+            )
+            dialog.accept()
+            if self.path_edit.text():
+                self._start_scan()
+
+        undo_button.clicked.connect(restore_selected)
+        dialog.exec()
+
+    def closeEvent(self, event) -> None:  # noqa: N802, ANN001
+        if self._scan_thread is not None and self._scan_thread.isRunning():
+            self._scan_thread.requestInterruption()
+            self.notice.setText("Stopping the read-only scan before closing…")
+            event.ignore()
+            self._scan_thread.finished.connect(self.close)
+            return
+        super().closeEvent(event)

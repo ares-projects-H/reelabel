@@ -40,7 +40,6 @@ def stylesheet(dark: bool = True) -> str:
 
     return f"""
     * {{
-        font-family: "Inter", "Segoe UI", "SF Pro Text", sans-serif;
         font-size: 13px;
         color: {colors["text"]};
     }}
@@ -170,4 +169,3 @@ def stylesheet(dark: bool = True) -> str:
         border-top: 1px solid {colors["border"]};
     }}
     """
-

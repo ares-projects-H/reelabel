@@ -8,7 +8,7 @@ import sys
 import threading
 import uuid
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -152,6 +152,10 @@ class Report:
     ignored: list[tuple[Path, str]] = field(default_factory=list)
     conflicts: list[tuple[Path, str]] = field(default_factory=list)
     missing_subtitles: list[tuple[Path, str]] = field(default_factory=list)
+
+
+class ScanCancelled(RuntimeError):
+    """Raised when a caller asks a read-only folder scan to stop."""
 
 
 def _normal_space(value: str) -> str:
@@ -425,10 +429,17 @@ def load_config(config_path: Path | None) -> dict[str, set[str]]:
     return config
 
 
-def discover(root: Path, recursive: bool, config: dict[str, set[str]]) -> tuple[list[Path], list[Path]]:
+def discover(
+    root: Path,
+    recursive: bool,
+    config: dict[str, set[str]],
+    cancelled: Callable[[], bool] | None = None,
+) -> tuple[list[Path], list[Path]]:
     iterator: Iterable[Path] = root.rglob("*") if recursive else root.iterdir()
     videos, subtitles = [], []
     for path in iterator:
+        if cancelled is not None and cancelled():
+            raise ScanCancelled("The scan was cancelled.")
         if not path.is_file():
             continue
         suffix = path.suffix.casefold()
@@ -478,6 +489,7 @@ def build_report(
     include_extras: bool = False,
     config_path: Path | None = None,
     include_sidecars: bool = False,
+    cancelled: Callable[[], bool] | None = None,
 ) -> Report:
     """Build a read-only rename report without leaking custom config globally.
 
@@ -497,6 +509,7 @@ def build_report(
                 include_extras,
                 config_path,
                 include_sidecars,
+                cancelled,
             )
         finally:
             TECHNICAL_TOKENS.clear()
@@ -514,13 +527,14 @@ def _build_report(
     include_extras: bool,
     config_path: Path | None,
     include_sidecars: bool,
+    cancelled: Callable[[], bool] | None,
 ) -> Report:
     root = root.resolve()
     config = load_config(config_path)
     # Configuration only extends the conservative built-ins for this process.
     TECHNICAL_TOKENS.update(config["technical_tokens"])
     EXTRA_TOKENS.update(config["extra_tokens"])
-    videos, subtitles = discover(root, recursive, config)
+    videos, subtitles = discover(root, recursive, config, cancelled)
     report = Report(len(videos), len(subtitles))
     video_items = [MediaFile(path, "video", parse_media_name(path, root)) for path in videos]
     subtitle_items = [MediaFile(path, "subtitle", parse_media_name(path, root), subtitle_suffixes(path)) for path in subtitles]
@@ -663,12 +677,26 @@ def _destination_is_free(destination: Path) -> bool:
     return not any(path.name.casefold() == destination.name.casefold() for path in destination.parent.iterdir())
 
 
-def execute(report: Report, root: Path) -> tuple[Path, Path]:
+def execute(
+    report: Report,
+    root: Path,
+    history_dir: Path | None = None,
+) -> tuple[Path, Path]:
+    """Apply a prepared report and write its audit files outside media folders.
+
+    The CLI keeps its historical behavior by omitting ``history_dir``. The
+    desktop app passes its private data directory so library folders receive
+    only the explicitly approved media-name changes.
+    """
     safe = [r for r in report.renames if r.status == "proposed"]
     deletions = list(report.deletions) if safe else []
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    log_path = root / f"rename_log_{stamp}.json"
-    undo_path = root / f"rename_undo_{stamp}.json"
+    # Microseconds keep separate rapid operations from overwriting one another's
+    # audit files, which is important when the GUI applies small batches.
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    output_dir = history_dir or root
+    output_dir.mkdir(parents=True, exist_ok=True)
+    log_path = output_dir / f"rename_log_{stamp}.json"
+    undo_path = output_dir / f"rename_undo_{stamp}.json"
     outcomes: list[dict[str, str]] = []
     deletion_outcomes: list[dict[str, str]] = []
     temporary: list[tuple[Rename, Path]] = []
@@ -784,6 +812,10 @@ def print_report(report: Report, verbose: bool) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Import locally to keep the low-level engine usable on its own while both
+    # public interfaces share the same validated scan/apply/undo API.
+    from . import api as public_api
+
     # Windows consoles may default to a legacy code page that cannot print
     # Japanese, Korean, or other Unicode media filenames.  Keep reports
     # readable instead of failing partway through a dry-run.
@@ -814,7 +846,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.movies and args.series:
         parser.error("--movies et --series ne peuvent pas être utilisés ensemble")
     if args.undo:
-        count, errors = undo(Path(args.undo), args.undo_scope)
+        if args.undo_scope:
+            count, errors = undo(Path(args.undo), args.undo_scope)
+        else:
+            undo_result = public_api.undo(Path(args.undo))
+            count, errors = undo_result.restored, list(undo_result.errors)
         print(f"Annulation: {count} fichier(s) restauré(s).")
         for error in errors:
             print(error, file=sys.stderr)
@@ -825,22 +861,74 @@ def main(argv: list[str] | None = None) -> int:
     if not root.is_dir():
         parser.error(f"dossier introuvable: {root}")
     try:
-        report = build_report(
-            root,
-            args.recursive,
-            "movies" if args.movies else "series" if args.series else None,
-            args.include_extras,
-            args.config,
-            args.delete_sidecars,
-        )
-    except ValueError as exc:
+        if args.config:
+            # Custom configuration is retained as an advanced legacy CLI
+            # feature. The standard path below is the shared public API.
+            report = build_report(
+                root,
+                args.recursive,
+                "movies" if args.movies else "series" if args.series else None,
+                args.include_extras,
+                args.config,
+                args.delete_sidecars,
+            )
+            scan_report = public_api.ScanReport(
+                public_api.ScanOptions(
+                    root.resolve(),
+                    recursive=args.recursive,
+                    media_type=(
+                        public_api.MediaScope.MOVIES
+                        if args.movies
+                        else public_api.MediaScope.SERIES
+                        if args.series
+                        else public_api.MediaScope.ALL
+                    ),
+                    include_extras=args.include_extras,
+                    include_sidecars=args.delete_sidecars,
+                ),
+                report,
+            )
+        else:
+            scan_report = public_api.scan(
+                public_api.ScanOptions(
+                    root,
+                    recursive=args.recursive,
+                    media_type=(
+                        public_api.MediaScope.MOVIES
+                        if args.movies
+                        else public_api.MediaScope.SERIES
+                        if args.series
+                        else public_api.MediaScope.ALL
+                    ),
+                    include_extras=args.include_extras,
+                    include_sidecars=args.delete_sidecars,
+                )
+            )
+            report = scan_report.engine_report
+    except (ValueError, NotADirectoryError) as exc:
         parser.error(str(exc))
     print_report(report, args.verbose)
     if args.apply:
+        selected = {
+            rename.source: rename.destination.name
+            for rename in report.renames
+            if rename.status == "proposed"
+        }
         try:
-            log_path, undo_path = execute(report, root.resolve())
-        except OSError as exc:
+            result = public_api.apply(
+                scan_report,
+                selected,
+                delete_sidecars=args.delete_sidecars,
+                selected_sidecars=(
+                    deletion.path for deletion in report.deletions
+                ),
+                history_dir=root.resolve(),
+            )
+        except (OSError, public_api.InvalidEdits) as exc:
             print(f"Erreur de renommage: {exc}", file=sys.stderr)
             return 1
-        print(f"Journal: {log_path}\nAnnulation: {undo_path}")
+        print(
+            f"Journal: {result.log_path}\n"
+            f"Annulation: {result.history_entry}"
+        )
     return 0

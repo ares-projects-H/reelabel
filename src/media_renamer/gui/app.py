@@ -14,11 +14,12 @@ def main() -> int:
     application = QApplication.instance() or QApplication(sys.argv)
     application.setApplicationName("Media Renamer")
     application.setOrganizationName("ares-projects-H")
-    window = MainWindow(demo=True)
+    # No font family is forced: Qt uses the platform's native application font
+    # (San Francisco, Segoe UI, or the configured Linux desktop font).
+    window = MainWindow(demo=False)
     window.show()
     return application.exec()
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

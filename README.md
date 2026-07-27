@@ -4,21 +4,24 @@ Media Renamer is a safe, offline desktop utility for cleaning movie, series,
 and subtitle filenames. It always previews proposed changes first, preserves
 media contents and folders, and refuses ambiguous or conflicting operations.
 
-> Current milestone: interface validation. The desktop Apply button is
-> intentionally disabled until the functional alpha is reviewed.
+> Current milestone: functional alpha (validation 2). Use a copy of your media
+> while testing this development version.
 
 ## Interface preview
 
-![Media Renamer interface preview](docs/screenshots/interface-preview.png)
+![Media Renamer functional alpha](docs/screenshots/interface-alpha.png)
 
-The first prototype includes:
+The functional alpha includes:
 
 - folder selection and drag-and-drop;
 - movie, series, recursion, and extras options;
-- an editable before/after preview table;
-- Ready, Review, and Ignored filters;
-- related image/NFO deletion disabled by default;
-- a clearly disabled Apply action during the visual validation milestone.
+- a cancellable background scan;
+- an editable before/after preview with working Ready, Review, and Ignored filters;
+- cross-platform filename, extension, path, and collision validation;
+- partial selection and transactional rename application;
+- app-data history with safe Undo;
+- related image/NFO deletion shown only when requested, unchecked by default,
+  and protected by a second confirmation.
 
 ## Run from source
 
@@ -30,6 +33,8 @@ media-renamer-gui
 ```
 
 On Windows, activate the environment with `.venv\Scripts\activate`.
+The source version still needs Python; the standalone installers are planned
+for validation 3.
 
 ## Command line
 
@@ -52,8 +57,15 @@ Related images and NFO files are never proposed unless
 - No overwriting existing files.
 - No automatic image/NFO deletion.
 - Conflicts and uncertain subtitle matches are reported instead of guessed.
+- An apply failure triggers automatic restoration of already staged renames.
+
+## Project checkpoints
+
+- [Validation 1 — interface prototype](docs/validation-1.md)
+- [Validation 2 — functional alpha](docs/validation-2.md)
+- Validation 3 — Windows 10/11 x64 EXE, macOS DMGs, Linux AppImage, and
+  GitHub release (not started yet)
 
 ## License
 
 Media Renamer is available under the [MIT License](LICENSE).
-
