@@ -70,6 +70,9 @@ SEASON_FOLDER_RE = re.compile(r"^(?:s(?:eason|aison)?\s*)?(\d{1,2})$|^s(\d{1,2})
 SEASON_TITLE_SUFFIX_RE = re.compile(
     r"^(?P<title>.+?)\s+(?:S(?:eason|aison)?\s*)(?P<season>\d{1,2})$", re.I
 )
+FOLDER_SEASON_RE = re.compile(
+    r"\bS(?:EASON|AISON)?\s*(?P<season>\d{1,2})(?!\w)", re.I
+)
 
 
 @dataclass
@@ -133,6 +136,7 @@ class Rename:
     reason: str
     status: str = "proposed"
     detail: str = ""
+    kind: str = "file"
 
 
 @dataclass
@@ -215,6 +219,33 @@ def _extract_year(value: str) -> tuple[str, str | None]:
     # Removing a year from "Title (2020)" must not leave "Title ( )".
     cleaned = re.sub(r"[\(\[\{]\s*[\)\]\}]", " ", cleaned)
     return _normal_space(cleaned), match.group(1)
+
+
+def normalize_folder_name(value: str) -> str:
+    """Build a clean movie, series, or collection folder title.
+
+    Folder proposals reuse the conservative release-token cleanup used for
+    media files. A recognizable season marker is retained at the end, while a
+    movie year uses the familiar ``Title (Year)`` form.
+    """
+
+    cleaned = _remove_technical(value)
+    season_match = FOLDER_SEASON_RE.search(cleaned)
+    season = int(season_match.group("season")) if season_match else None
+    if season_match:
+        cleaned = (
+            cleaned[: season_match.start()] + " " + cleaned[season_match.end() :]
+        )
+    without_year, year = _extract_year(cleaned)
+    title = _title_case(without_year)
+    if not title:
+        return value
+    result = title
+    if year:
+        result += f" ({year})"
+    if season is not None:
+        result += f" S{season:02d}"
+    return result
 
 
 def _extract_disc(value: str) -> tuple[str, int | None]:
@@ -614,17 +645,43 @@ def _build_report(
             report.missing_subtitles.append((video.path, video.parsed.display()))
 
     _mark_conflicts(report)
+    changed_directories = {
+        rename.source.parent
+        for rename in report.renames
+        if rename.status == "proposed" and rename.source.is_file()
+    }
     # Related artwork and NFO files are informational in the public app.
     # They are listed only after an explicit opt-in, never by default.
-    changed_directories = (
-        {rename.source.parent for rename in report.renames if rename.status == "proposed"}
-        if include_sidecars
-        else set()
-    )
-    for directory in sorted(changed_directories):
-        for path in sorted(directory.iterdir()):
-            if path.is_file() and path.suffix.casefold() in SIDECAR_EXTENSIONS:
-                report.deletions.append(Deletion(path))
+    if include_sidecars:
+        for directory in sorted(changed_directories):
+            for path in sorted(directory.iterdir()):
+                if path.is_file() and path.suffix.casefold() in SIDECAR_EXTENSIONS:
+                    report.deletions.append(Deletion(path))
+
+    # Propose only leaf media directories. Avoiding nested directory operations
+    # keeps file and folder changes understandable and safely reversible in one
+    # operation, including when the selected folder itself is a release folder.
+    leaf_directories = {
+        directory
+        for directory in changed_directories
+        if not any(
+            other != directory and other.is_relative_to(directory)
+            for other in changed_directories
+        )
+    }
+    for directory in sorted(leaf_directories):
+        proposed_name = normalize_folder_name(directory.name)
+        destination = directory.with_name(proposed_name)
+        if proposed_name and destination != directory:
+            report.renames.append(
+                Rename(
+                    directory,
+                    destination,
+                    "folder name normalized",
+                    kind="directory",
+                )
+            )
+    _mark_conflicts(report)
     return report
 
 
@@ -677,6 +734,25 @@ def _destination_is_free(destination: Path) -> bool:
     return not any(path.name.casefold() == destination.name.casefold() for path in destination.parent.iterdir())
 
 
+def _path_after_directory_renames(
+    path: Path,
+    directory_renames: Iterable[Rename],
+) -> Path:
+    """Return where a child path lives after its containing directory moves."""
+
+    for rename in sorted(
+        directory_renames,
+        key=lambda item: len(item.source.parts),
+        reverse=True,
+    ):
+        try:
+            relative = path.relative_to(rename.source)
+        except ValueError:
+            continue
+        return rename.destination / relative
+    return path
+
+
 def execute(
     report: Report,
     root: Path,
@@ -688,7 +764,11 @@ def execute(
     desktop app passes its private data directory so library folders receive
     only the explicitly approved media-name changes.
     """
-    safe = [r for r in report.renames if r.status == "proposed"]
+    safe = [rename for rename in report.renames if rename.status == "proposed"]
+    file_renames = [rename for rename in safe if rename.kind != "directory"]
+    directory_renames = [
+        rename for rename in safe if rename.kind == "directory"
+    ]
     deletions = list(report.deletions) if safe else []
     # Microseconds keep separate rapid operations from overwriting one another's
     # audit files, which is important when the GUI applies small batches.
@@ -699,16 +779,33 @@ def execute(
     undo_path = output_dir / f"rename_undo_{stamp}.json"
     outcomes: list[dict[str, str]] = []
     deletion_outcomes: list[dict[str, str]] = []
-    temporary: list[tuple[Rename, Path]] = []
+    file_temporary: list[tuple[Rename, Path]] = []
+    directory_temporary: list[tuple[Rename, Path]] = []
     staged_deletions: list[tuple[Deletion, Path]] = []
-    finalized_sources: set[Path] = set()
+    finalized_files: set[Path] = set()
+    finalized_directories: set[Path] = set()
+    directory_commit_succeeded = False
     try:
         for rename in safe:
             if not rename.source.exists():
                 raise FileNotFoundError(f"source disparue depuis la planification: {rename.source}")
+            if rename.kind == "directory" and not rename.source.is_dir():
+                raise NotADirectoryError(
+                    f"le dossier planifié n'est plus un dossier: {rename.source}"
+                )
+        for first in directory_renames:
+            for second in directory_renames:
+                if first is not second and first.source.is_relative_to(second.source):
+                    raise OSError(
+                        "les renommages de dossiers imbriqués ne sont pas autorisés"
+                    )
+
+        # Files are completed while their parent folders still have their
+        # original paths. Folder moves happen only after every file succeeded.
+        for rename in file_renames:
             temp = rename.source.with_name(f".{rename.source.name}.rename-media-{uuid.uuid4().hex}.tmp")
             os.replace(rename.source, temp)
-            temporary.append((rename, temp))
+            file_temporary.append((rename, temp))
         for deletion in deletions:
             if not deletion.path.exists():
                 deletion.status = "missing"
@@ -717,41 +814,148 @@ def execute(
             temp = deletion.path.with_name(f".{deletion.path.name}.rename-media-delete-{uuid.uuid4().hex}.tmp")
             os.replace(deletion.path, temp)
             staged_deletions.append((deletion, temp))
-        for rename, temp in temporary:
+        for rename, temp in file_temporary:
             if not _destination_is_free(rename.destination):
                 raise FileExistsError(f"destination apparue depuis la planification: {rename.destination}")
             os.replace(temp, rename.destination)
-            finalized_sources.add(rename.source)
-            rename.status = "renamed"
-            outcomes.append({"old_path": str(rename.source), "new_path": str(rename.destination), "status": "renamed", "error": ""})
+            finalized_files.add(rename.source)
+
+        for rename in directory_renames:
+            temp = rename.source.with_name(
+                f".{rename.source.name}.rename-media-folder-{uuid.uuid4().hex}.tmp"
+            )
+            os.replace(rename.source, temp)
+            directory_temporary.append((rename, temp))
+        for rename, temp in directory_temporary:
+            if not _destination_is_free(rename.destination):
+                raise FileExistsError(
+                    f"destination apparue depuis la planification: {rename.destination}"
+                )
+            os.replace(temp, rename.destination)
+            finalized_directories.add(rename.source)
     except OSError as exc:
-        media_to_restore = [
-            (rename.destination if rename.source in finalized_sources else temp, rename.source)
-            for rename, temp in temporary
+        # Restore folders first so file paths once again point into their
+        # original parent directories, then restore files and staged sidecars.
+        directory_to_restore = [
+            (
+                rename.destination
+                if rename.source in finalized_directories
+                else temp,
+                rename.source,
+            )
+            for rename, temp in directory_temporary
         ]
-        rollback_errors = _rollback_paths(media_to_restore + [(temp, deletion.path) for deletion, temp in staged_deletions])
-        outcomes.append({"old_path": "", "new_path": "", "status": "error", "error": str(exc)})
+        rollback_errors = _rollback_paths(directory_to_restore)
+        media_to_restore = [
+            (
+                rename.destination
+                if rename.source in finalized_files
+                else temp,
+                rename.source,
+            )
+            for rename, temp in file_temporary
+        ]
+        rollback_errors.extend(
+            _rollback_paths(
+                media_to_restore
+                + [
+                    (temp, deletion.path)
+                    for deletion, temp in staged_deletions
+                ]
+            )
+        )
+        outcomes.append(
+            {"old_path": "", "new_path": "", "status": "error", "error": str(exc)}
+        )
         if rollback_errors:
-            outcomes.extend({"old_path": "", "new_path": "", "status": "rollback_error", "error": error} for error in rollback_errors)
-        raise OSError(f"{exc}" + (f"; erreurs de restauration: {'; '.join(rollback_errors)}" if rollback_errors else "")) from exc
+            outcomes.extend(
+                {
+                    "old_path": "",
+                    "new_path": "",
+                    "status": "rollback_error",
+                    "error": error,
+                }
+                for error in rollback_errors
+            )
+        raise OSError(
+            f"{exc}"
+            + (
+                f"; erreurs de restauration: {'; '.join(rollback_errors)}"
+                if rollback_errors
+                else ""
+            )
+        ) from exc
     else:
+        for rename in file_renames:
+            rename.status = "renamed"
+            outcomes.append(
+                {
+                    "old_path": str(rename.source),
+                    "new_path": str(
+                        _path_after_directory_renames(
+                            rename.destination, directory_renames
+                        )
+                    ),
+                    "status": "renamed",
+                    "error": "",
+                    "kind": "file",
+                }
+            )
+        for rename in directory_renames:
+            rename.status = "renamed"
+            outcomes.append(
+                {
+                    "old_path": str(rename.source),
+                    "new_path": str(rename.destination),
+                    "status": "renamed",
+                    "error": "",
+                    "kind": "directory",
+                }
+            )
+        directory_commit_succeeded = True
+
         # Sidecars are removed only after every rename has committed.
         for deletion, temp in staged_deletions:
+            current_temp = _path_after_directory_renames(
+                temp, directory_renames
+            )
+            current_original = _path_after_directory_renames(
+                deletion.path, directory_renames
+            )
             try:
-                temp.unlink()
+                current_temp.unlink()
                 deletion.status = "deleted"
-                deletion_outcomes.append({"path": str(deletion.path), "status": "deleted", "error": ""})
+                deletion_outcomes.append(
+                    {
+                        "path": str(current_original),
+                        "status": "deleted",
+                        "error": "",
+                    }
+                )
             except OSError as exc:
                 deletion.status = "error"
                 deletion.detail = str(exc)
                 try:
-                    if not deletion.path.exists():
-                        os.replace(temp, deletion.path)
+                    if not current_original.exists():
+                        os.replace(current_temp, current_original)
                 except OSError as restore_exc:
                     deletion.detail += f"; restauration impossible: {restore_exc}"
-                deletion_outcomes.append({"path": str(deletion.path), "status": "error", "error": deletion.detail})
+                deletion_outcomes.append(
+                    {
+                        "path": str(current_original),
+                        "status": "error",
+                        "error": deletion.detail,
+                    }
+                )
     finally:
         payload = {"created_at": datetime.now(timezone.utc).isoformat(), "operations": outcomes, "deletions": deletion_outcomes}
+        if directory_commit_succeeded:
+            log_path = _path_after_directory_renames(
+                log_path, directory_renames
+            )
+            undo_path = _path_after_directory_renames(
+                undo_path, directory_renames
+            )
         log_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         undo_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     return log_path, undo_path
@@ -759,39 +963,117 @@ def execute(
 
 def undo(undo_path: Path, scope: Path | None = None) -> tuple[int, list[str]]:
     data = json.loads(undo_path.read_text(encoding="utf-8"))
-    operations = [(Path(x["new_path"]), Path(x["old_path"])) for x in data.get("operations", []) if x.get("status") == "renamed"]
+    entries = [
+        item
+        for item in data.get("operations", [])
+        if item.get("status") == "renamed"
+    ]
     if scope is not None:
         resolved_scope = scope.resolve()
-        operations = [
-            (source, destination)
-            for source, destination in operations
-            if destination.resolve().is_relative_to(resolved_scope)
+        entries = [
+            item
+            for item in entries
+            if Path(item["old_path"]).resolve().is_relative_to(resolved_scope)
         ]
-        if not operations:
+        if not entries:
             return 0, [f"Aucune opération d'annulation dans le dossier: {resolved_scope}"]
-    sources = {source.resolve() for source, _ in operations}
-    errors = [f"Conflit: {destination}" for source, destination in operations if not source.exists() or (destination.exists() and destination.resolve() not in sources)]
+
+    directory_operations = [
+        (Path(item["new_path"]), Path(item["old_path"]))
+        for item in entries
+        if item.get("kind") == "directory"
+    ]
+    file_operations = [
+        (Path(item["new_path"]), Path(item["old_path"]))
+        for item in entries
+        if item.get("kind") != "directory"
+    ]
+    all_sources = {
+        source.resolve()
+        for source, _ in directory_operations + file_operations
+    }
+    errors = [
+        f"Conflit: {destination}"
+        for source, destination in directory_operations + file_operations
+        if not source.exists()
+        or (
+            destination.exists()
+            and destination.resolve() not in all_sources
+        )
+    ]
     if errors:
         return 0, errors
-    temporary: list[tuple[Path, Path, Path]] = []
-    finalized_sources: set[Path] = set()
+
+    directory_temporary: list[tuple[Path, Path, Path]] = []
+    file_temporary: list[tuple[Path, Path, Path]] = []
+    finalized_directories: set[Path] = set()
+    finalized_files: set[Path] = set()
     try:
-        for source, destination in operations:
+        # Restore directory names first. File source paths are then mapped into
+        # those restored directories before their individual names are undone.
+        for source, destination in directory_operations:
             temp = source.with_name(f".{source.name}.rename-media-undo-{uuid.uuid4().hex}.tmp")
             os.replace(source, temp)
-            temporary.append((source, temp, destination))
-        for source, temp, destination in temporary:
+            directory_temporary.append((source, temp, destination))
+        for source, temp, destination in directory_temporary:
             if not _destination_is_free(destination):
                 raise FileExistsError(f"destination apparue pendant l'annulation: {destination}")
             os.replace(temp, destination)
-            finalized_sources.add(source)
-        return len(operations), []
-    except OSError as exc:
-        to_restore = [
-            (destination if source in finalized_sources else temp, source)
-            for source, temp, destination in temporary
+            finalized_directories.add(source)
+
+        reverse_directories = [
+            Rename(source, destination, "undo directory", kind="directory")
+            for source, destination in directory_operations
         ]
-        return 0, [str(exc), *_rollback_paths(to_restore)]
+        mapped_file_operations = [
+            (
+                _path_after_directory_renames(source, reverse_directories),
+                destination,
+            )
+            for source, destination in file_operations
+        ]
+        mapped_sources = {
+            source.resolve() for source, _ in mapped_file_operations
+        }
+        for source, destination in mapped_file_operations:
+            if not source.exists() or (
+                destination.exists()
+                and destination.resolve() not in mapped_sources
+            ):
+                raise FileExistsError(f"conflit pendant l'annulation: {destination}")
+            temp = source.with_name(
+                f".{source.name}.rename-media-undo-{uuid.uuid4().hex}.tmp"
+            )
+            os.replace(source, temp)
+            file_temporary.append((source, temp, destination))
+        for source, temp, destination in file_temporary:
+            if not _destination_is_free(destination):
+                raise FileExistsError(
+                    f"destination apparue pendant l'annulation: {destination}"
+                )
+            os.replace(temp, destination)
+            finalized_files.add(source)
+        return len(entries), []
+    except OSError as exc:
+        file_to_restore = [
+            (
+                destination if source in finalized_files else temp,
+                source,
+            )
+            for source, temp, destination in file_temporary
+        ]
+        rollback_errors = _rollback_paths(file_to_restore)
+        directory_to_restore = [
+            (
+                destination
+                if source in finalized_directories
+                else temp,
+                source,
+            )
+            for source, temp, destination in directory_temporary
+        ]
+        rollback_errors.extend(_rollback_paths(directory_to_restore))
+        return 0, [str(exc), *rollback_errors]
 
 
 def print_report(report: Report, verbose: bool) -> None:

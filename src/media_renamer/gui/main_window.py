@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -40,6 +41,11 @@ from .styles import stylesheet
 SOURCE_ROLE = int(Qt.ItemDataRole.UserRole)
 CATEGORY_ROLE = SOURCE_ROLE + 1
 KIND_ROLE = SOURCE_ROLE + 2
+EDIT_BASE_ROLE = SOURCE_ROLE + 3
+EPISODE_EDIT_RE = re.compile(
+    r"(?:(?P<season>S\d{1,2})\s+)?(?P<episode>E\d{1,3}(?:[.-]\d+)?)",
+    re.I,
+)
 
 REASON_TRANSLATIONS = {
     "nom vidéo normalisé": "Normalized video filename.",
@@ -59,6 +65,7 @@ REASON_TRANSLATIONS = {
     "destination existante ou collision de casse": (
         "The destination exists or differs only by letter case."
     ),
+    "folder name normalized": "Normalized folder name.",
 }
 
 
@@ -74,6 +81,12 @@ class DemoRow:
 
 
 DEMO_ROWS = (
+    DemoRow(
+        "Ready",
+        "Gotham.S04.1080p.x265-ZMNT",
+        "Gotham S04",
+        "FOLDER",
+    ),
     DemoRow(
         "Ready",
         "[MagicStar] Jikou Keisatsu 2019 Fukkatsu SP WEB-DL.mkv",
@@ -326,6 +339,10 @@ class MainWindow(QMainWindow):
         self.table.setSelectionBehavior(
             QAbstractItemView.SelectionBehavior.SelectRows
         )
+        self.table.setToolTip(
+            "Edit a proposed episode name to optionally update the same pattern "
+            "for other files in its folder."
+        )
         self.table.verticalHeader().setVisible(False)
         self.table.itemChanged.connect(self._table_item_changed)
         header = self.table.horizontalHeader()
@@ -469,7 +486,11 @@ class MainWindow(QMainWindow):
                     status="Ready",
                     original=self._relative_name(rename.source, report.options.folder),
                     proposed=rename.destination.name,
-                    media_type=rename.source.suffix.removeprefix(".").upper(),
+                    media_type=(
+                        "FOLDER"
+                        if rename.kind == "directory"
+                        else rename.source.suffix.removeprefix(".").upper()
+                    ),
                     selected=True,
                     category="ready",
                     kind="rename",
@@ -481,7 +502,11 @@ class MainWindow(QMainWindow):
                     status="Review",
                     original=self._relative_name(rename.source, report.options.folder),
                     proposed=rename.destination.name,
-                    media_type=rename.source.suffix.removeprefix(".").upper(),
+                    media_type=(
+                        "FOLDER"
+                        if rename.kind == "directory"
+                        else rename.source.suffix.removeprefix(".").upper()
+                    ),
                     selected=False,
                     category="review",
                     kind="conflict",
@@ -584,6 +609,7 @@ class MainWindow(QMainWindow):
         )
         original_item.setData(SOURCE_ROLE, str(source) if source else "")
         proposed_item = QTableWidgetItem(proposed)
+        proposed_item.setData(EDIT_BASE_ROLE, proposed)
         if kind != "rename":
             proposed_item.setFlags(
                 proposed_item.flags() & ~Qt.ItemFlag.ItemIsEditable
@@ -624,7 +650,7 @@ class MainWindow(QMainWindow):
 
     def _show_empty_state(self) -> None:
         self._set_summary(
-            (("0", "FILES FOUND"), ("0", "READY"), ("0", "REVIEW"), ("0", "IGNORED"))
+            (("0", "ITEMS FOUND"), ("0", "READY"), ("0", "REVIEW"), ("0", "IGNORED"))
         )
         self._refresh_filter_labels({"all": 0, "ready": 0, "review": 0, "ignored": 0})
 
@@ -652,7 +678,7 @@ class MainWindow(QMainWindow):
         self._refresh_filter_labels(counts)
         self._set_summary(
             (
-                (str(counts["all"]), "FILES FOUND"),
+                (str(counts["all"]), "ITEMS FOUND"),
                 (str(counts["ready"]), "READY"),
                 (str(counts["review"]), "REVIEW"),
                 (str(counts["ignored"]), "IGNORED"),
@@ -693,7 +719,142 @@ class MainWindow(QMainWindow):
     def _table_item_changed(self, item: QTableWidgetItem) -> None:
         if self._loading_table or item.column() not in {0, 3}:
             return
+        if item.column() == 3:
+            previous = item.data(EDIT_BASE_ROLE)
+            if isinstance(previous, str) and previous != item.text():
+                self._offer_batch_edit(item.row(), previous, item.text())
+                item.setData(EDIT_BASE_ROLE, item.text())
         self._revalidate_table()
+
+    def _batch_episode_name(
+        self,
+        original_template: str,
+        edited_template: str,
+        candidate: str,
+    ) -> str | None:
+        """Apply a corrected title/season pattern while preserving episode numbers."""
+
+        original_match = EPISODE_EDIT_RE.search(original_template)
+        edited_match = EPISODE_EDIT_RE.search(edited_template)
+        candidate_match = EPISODE_EDIT_RE.search(candidate)
+        if not original_match or not edited_match or not candidate_match:
+            return None
+
+        original_prefix = original_template[: original_match.start()]
+        edited_prefix = edited_template[: edited_match.start()]
+        candidate_prefix = candidate[: candidate_match.start()]
+        original_season = original_match.group("season")
+        edited_season = edited_match.group("season")
+        if (
+            original_prefix.casefold() == edited_prefix.casefold()
+            and (original_season or "").casefold()
+            == (edited_season or "").casefold()
+        ):
+            return None
+        if candidate_prefix.casefold() != original_prefix.casefold():
+            return None
+
+        episode = candidate_match.group("episode").upper()
+        token = (
+            f"{edited_season.upper()} {episode}"
+            if edited_season
+            else episode
+        )
+        return (
+            edited_prefix
+            + token
+            + candidate[candidate_match.end() :]
+        )
+
+    def _offer_batch_edit(
+        self,
+        edited_row: int,
+        previous_name: str,
+        edited_name: str,
+    ) -> None:
+        """Offer to propagate a title/season correction inside one folder."""
+
+        if self.current_report is None:
+            return
+        source_value = self.table.item(edited_row, 2).data(SOURCE_ROLE)
+        if not source_value:
+            return
+        source = Path(source_value)
+        if not source.is_file():
+            return
+
+        changes: list[tuple[int, str]] = []
+        for row in range(self.table.rowCount()):
+            if row == edited_row:
+                continue
+            status = self.table.item(row, 1)
+            if status.data(KIND_ROLE) != "rename":
+                continue
+            other_value = self.table.item(row, 2).data(SOURCE_ROLE)
+            if not other_value:
+                continue
+            other_source = Path(other_value)
+            if not other_source.is_file() or other_source.parent != source.parent:
+                continue
+            proposed = self.table.item(row, 3).text()
+            updated = self._batch_episode_name(
+                previous_name,
+                edited_name,
+                proposed,
+            )
+            if updated and updated != proposed:
+                changes.append((row, updated))
+        if not changes:
+            return
+
+        if not self._confirm_action(
+            "Update this folder's proposals?",
+            f"Apply the same title and season pattern to {len(changes)} other item(s)?",
+            "Episode numbers and subtitle suffixes will be preserved. "
+            "You can still review, edit, or uncheck every result before applying.",
+            "Update proposals",
+        ):
+            return
+
+        self._loading_table = True
+        for row, updated in changes:
+            proposed_item = self.table.item(row, 3)
+            proposed_item.setText(updated)
+            proposed_item.setData(EDIT_BASE_ROLE, updated)
+        self._loading_table = False
+
+    def _confirm_action(
+        self,
+        title: str,
+        text: str,
+        details: str,
+        accept_label: str,
+    ) -> bool:
+        """Show a high-contrast confirmation using the application logo."""
+
+        message = QMessageBox(self)
+        message.setWindowTitle(title)
+        logo = QPixmap(str(project_asset("media-renamer-icon.png")))
+        if not logo.isNull():
+            message.setIconPixmap(
+                logo.scaled(
+                    64,
+                    64,
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation,
+                )
+            )
+        message.setText(text)
+        message.setInformativeText(details)
+        message.setStandardButtons(QMessageBox.StandardButton.Cancel)
+        accept = message.addButton(
+            accept_label,
+            QMessageBox.ButtonRole.AcceptRole,
+        )
+        accept.setObjectName("primary")
+        message.setDefaultButton(accept)
+        message.exec()
+        return message.clickedButton() is accept
 
     def _selected_edits(self) -> dict[Path, str]:
         edits: dict[Path, str] = {}
@@ -770,29 +931,45 @@ class MainWindow(QMainWindow):
             )
             return
         sidecars = self._selected_sidecars()
-        answer = QMessageBox.question(
-            self,
+        folder_count = sum(source.is_dir() for source in edits)
+        file_count = len(edits) - folder_count
+        parts = []
+        if file_count:
+            parts.append(
+                f"{file_count} {'file' if file_count == 1 else 'files'}"
+            )
+        if folder_count:
+            parts.append(
+                f"{folder_count} {'folder' if folder_count == 1 else 'folders'}"
+            )
+        if not self._confirm_action(
             "Apply selected changes?",
-            f"Rename {len(edits)} file(s)?\n\n"
-            "The operation is transactional and an undo entry will be saved.",
-        )
-        if answer != QMessageBox.StandardButton.Yes:
+            f"Rename {' and '.join(parts)}?",
+            "Media Renamer will check every destination again before making changes. "
+            "If any rename fails, completed changes are automatically restored. "
+            "A History / Undo entry will be saved.",
+            "Rename selected items",
+        ):
             return
         if sidecars:
-            warning = QMessageBox.warning(
-                self,
+            if not self._confirm_action(
                 "Permanently delete related files?",
-                f"{len(sidecars)} selected image/NFO file(s) will be permanently deleted.\n\n"
-                "These deletions cannot be restored by Undo.",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
-                QMessageBox.StandardButton.Cancel,
-            )
-            if warning != QMessageBox.StandardButton.Yes:
+                f"Delete {len(sidecars)} selected image/NFO file(s)?",
+                "This deletion is permanent and cannot be restored from History / Undo. "
+                "Cancel now if you want to keep these files.",
+                "Delete permanently",
+            ):
                 return
 
+        next_scan_folder = self.current_report.options.folder
+        selected_root_name = edits.get(self.current_report.options.folder)
+        if selected_root_name:
+            next_scan_folder = self.current_report.options.folder.with_name(
+                selected_root_name.strip()
+            )
         self.apply_button.setEnabled(False)
         self.scan_button.setEnabled(False)
-        self.notice.setText("Applying the validated transaction…")
+        self.notice.setText("Applying checked changes safely…")
         try:
             result = api.apply(
                 self.current_report,
@@ -809,14 +986,15 @@ class MainWindow(QMainWindow):
             return
 
         self.notice.setText(
-            f"✓ Renamed {result.renamed} file(s); an Undo entry was saved"
+            f"✓ Renamed {result.renamed} item(s); an Undo entry was saved"
         )
         QMessageBox.information(
             self,
             "Changes applied",
-            f"{result.renamed} file(s) renamed successfully.\n"
+            f"{result.renamed} item(s) renamed successfully.\n"
             f"History entry:\n{result.history_entry}",
         )
+        self.path_edit.setText(str(next_scan_folder))
         self.scan_button.setEnabled(True)
         self._start_scan()
 
@@ -826,7 +1004,8 @@ class MainWindow(QMainWindow):
         dialog.resize(720, 420)
         layout = QVBoxLayout(dialog)
         explanation = QLabel(
-            "Undo restores renamed files only when doing so cannot overwrite an existing file."
+            "Undo restores renamed files and folders only when doing so cannot "
+            "overwrite an existing item."
         )
         explanation.setWordWrap(True)
         layout.addWidget(explanation)
@@ -867,20 +1046,41 @@ class MainWindow(QMainWindow):
             item = entries.currentItem()
             if item is None or not item.flags() & Qt.ItemFlag.ItemIsEnabled:
                 return
-            answer = QMessageBox.question(
-                dialog,
+            if not self._confirm_action(
                 "Undo this operation?",
-                "Original filenames will be restored only if every destination is safe.",
-            )
-            if answer != QMessageBox.StandardButton.Yes:
+                "Restore the original file and folder names?",
+                "Nothing will be overwritten. Undo stops and restores the current "
+                "state if any original destination is no longer safe.",
+                "Restore original names",
+            ):
                 return
-            result = api.undo(Path(item.data(Qt.ItemDataRole.UserRole)))
+            history_path = Path(item.data(Qt.ItemDataRole.UserRole))
+            try:
+                history_payload = json.loads(
+                    history_path.read_text(encoding="utf-8")
+                )
+            except (OSError, json.JSONDecodeError):
+                history_payload = {}
+            result = api.undo(history_path)
             if result.errors:
                 QMessageBox.critical(dialog, "Undo could not run", "\n".join(result.errors))
                 return
             QMessageBox.information(
-                dialog, "Undo complete", f"{result.restored} file(s) restored."
+                dialog, "Undo complete", f"{result.restored} item(s) restored."
             )
+            current_folder = Path(self.path_edit.text()).expanduser()
+            for operation in history_payload.get("operations", []):
+                if operation.get("kind") != "directory":
+                    continue
+                new_folder = Path(operation["new_path"])
+                try:
+                    relative = current_folder.relative_to(new_folder)
+                except ValueError:
+                    continue
+                self.path_edit.setText(
+                    str(Path(operation["old_path"]) / relative)
+                )
+                break
             dialog.accept()
             if self.path_edit.text():
                 self._start_scan()

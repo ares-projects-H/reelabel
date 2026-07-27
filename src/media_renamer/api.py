@@ -166,8 +166,9 @@ def validate_edits(
         if rename is None:
             issues.append(ValidationIssue(source, "This item is not a safe proposed rename."))
             continue
+        is_directory = rename.kind == "directory"
         if not source.exists():
-            issues.append(ValidationIssue(source, "The source file disappeared after the scan."))
+            issues.append(ValidationIssue(source, "The source item disappeared after the scan."))
         if not name or name in {".", ".."}:
             issues.append(ValidationIssue(source, "The proposed filename is empty or invalid."))
             continue
@@ -181,9 +182,15 @@ def validate_edits(
             )
         if len(name) > 255:
             issues.append(ValidationIssue(source, "The filename is longer than 255 characters."))
-        if Path(name).suffix.casefold() != source.suffix.casefold():
+        if (
+            not is_directory
+            and Path(name).suffix.casefold() != source.suffix.casefold()
+        ):
             issues.append(ValidationIssue(source, "The original file extension must be preserved."))
-        if Path(name).stem.rstrip(" .").upper() in WINDOWS_RESERVED:
+        reserved_base = (
+            name.split(".", 1)[0] if is_directory else Path(name).stem
+        )
+        if reserved_base.rstrip(" .").upper() in WINDOWS_RESERVED:
             issues.append(ValidationIssue(source, "This filename is reserved by Windows."))
 
         destination = source.with_name(name)
@@ -240,6 +247,11 @@ def apply(
         videos_found=report.engine_report.videos_found,
         subtitles_found=report.engine_report.subtitles_found,
     )
+    proposed = {
+        rename.source.resolve(): rename
+        for rename in report.renames
+        if rename.status == "proposed"
+    }
     for source, filename in selected_items.items():
         resolved = Path(source).resolve()
         operation.renames.append(
@@ -247,6 +259,7 @@ def apply(
                 source=resolved,
                 destination=resolved.with_name(filename.strip()),
                 reason="user-approved desktop rename",
+                kind=proposed[resolved].kind,
             )
         )
     if delete_sidecars:
@@ -282,11 +295,27 @@ def undo(history_entry: Path) -> UndoResult:
         from datetime import datetime, timezone
 
         data["undone_at"] = datetime.now(timezone.utc).isoformat()
-        temporary = history_entry.with_suffix(".tmp")
+        actual_history_entry = history_entry
+        # A legacy CLI history file may live inside a folder that Undo just
+        # restored. Follow that folder move before marking the entry complete.
+        for operation in data.get("operations", []):
+            if (
+                operation.get("status") != "renamed"
+                or operation.get("kind") != "directory"
+            ):
+                continue
+            try:
+                relative = history_entry.relative_to(
+                    Path(operation["new_path"])
+                )
+            except ValueError:
+                continue
+            actual_history_entry = Path(operation["old_path"]) / relative
+            break
+        temporary = actual_history_entry.with_suffix(".tmp")
         temporary.write_text(
             json.dumps(data, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
-        os.replace(temporary, history_entry)
+        os.replace(temporary, actual_history_entry)
     return UndoResult(restored, tuple(errors))
-

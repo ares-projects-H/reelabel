@@ -8,10 +8,20 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from media_renamer.core import build_report, parse_media_name
+from media_renamer.core import (
+    build_report,
+    normalize_folder_name,
+    parse_media_name,
+)
 
 
 class CoreBehaviorTests(unittest.TestCase):
+    def test_release_folder_name_is_cleaned(self) -> None:
+        self.assertEqual(
+            normalize_folder_name("Gotham.S04.1080p.x265-ZMNT"),
+            "Gotham S04",
+        )
+
     def test_movie_release_name_is_cleaned(self) -> None:
         path = Path("/library/Always.Sunset.on.Third.Street.2005.1080p.BluRay.x264.mkv")
         parsed = parse_media_name(path, Path("/library"))

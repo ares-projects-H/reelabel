@@ -12,6 +12,7 @@ if PYSIDE_AVAILABLE:
     from PySide6.QtCore import Qt
     from PySide6.QtWidgets import QApplication
 
+    from media_renamer import api
     from media_renamer.gui.main_window import DEMO_ROWS, MainWindow
     from media_renamer.gui.styles import stylesheet
 
@@ -59,6 +60,26 @@ class GuiPrototypeTests(unittest.TestCase):
     def test_theme_uses_the_platform_font(self) -> None:
         self.assertNotIn("Inter", stylesheet())
 
+    def test_batch_edit_preserves_episode_numbers(self) -> None:
+        window = MainWindow(demo=False)
+        self.assertEqual(
+            window._batch_episode_name(
+                "Gothan S04 E01.mkv",
+                "Gotham S04 E01.mkv",
+                "Gothan S04 E09.ass",
+            ),
+            "Gotham S04 E09.ass",
+        )
+        self.assertEqual(
+            window._batch_episode_name(
+                "Black S01 E01.mkv",
+                "Black E01.mkv",
+                "Black S01 E10.fr.srt",
+            ),
+            "Black E10.fr.srt",
+        )
+        window.close()
+
 
 if __name__ == "__main__":
     unittest.main()
@@ -82,3 +103,34 @@ def test_real_scan_runs_in_worker_and_enables_safe_apply(
     )
     assert window.table.rowCount() >= 1
     assert window.apply_button.isEnabled()
+
+
+@unittest.skipUnless(PYSIDE_AVAILABLE, "PySide6 is not installed")
+def test_editing_one_episode_can_update_its_folder_group(
+    qtbot, tmp_path: Path, monkeypatch
+) -> None:
+    release = tmp_path / "Gothan.S04.1080p.x265-ZMNT"
+    release.mkdir()
+    for episode in (1, 2):
+        (release / f"Gothan.S04E{episode:02d}.1080p.x265-ZMNT.mkv").touch()
+    report = api.scan(api.ScanOptions(tmp_path))
+    window = MainWindow(demo=False)
+    qtbot.addWidget(window)
+    window.current_report = report
+    window._populate_report(report)
+    monkeypatch.setattr(window, "_confirm_action", lambda *args: True)
+
+    edited = next(
+        window.table.item(row, 3)
+        for row in range(window.table.rowCount())
+        if "E01.mkv" in window.table.item(row, 3).text()
+    )
+    edited.setText(edited.text().replace("Gothan", "Gotham"))
+
+    proposals = [
+        window.table.item(row, 3).text()
+        for row in range(window.table.rowCount())
+        if window.table.item(row, 4).text() == "MKV"
+    ]
+    assert "Gotham S04 E01.mkv" in proposals
+    assert "Gotham S04 E02.mkv" in proposals

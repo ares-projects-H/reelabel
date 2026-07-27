@@ -107,3 +107,164 @@ def test_related_file_requires_explicit_selection_and_flag(tmp_path: Path) -> No
     )
 
     assert poster.exists()
+
+
+def test_scan_proposes_clean_leaf_folder_name(tmp_path: Path) -> None:
+    release = tmp_path / "Gotham.S04.1080p.x265-ZMNT"
+    release.mkdir()
+    (release / "Gotham.S04E01.1080p.x265-ZMNT.mkv").touch()
+
+    report = api.scan(api.ScanOptions(tmp_path))
+
+    folder = next(
+        rename
+        for rename in report.renames
+        if rename.kind == "directory"
+    )
+    assert folder.source == release
+    assert folder.destination.name == "Gotham S04"
+
+
+def test_file_and_containing_folder_apply_and_undo_together(
+    tmp_path: Path,
+) -> None:
+    release = tmp_path / "Gotham.S04.1080p.x265-ZMNT"
+    release.mkdir()
+    original_file = release / "Gotham.S04E01.1080p.x265-ZMNT.mkv"
+    original_file.touch()
+    report = api.scan(api.ScanOptions(tmp_path))
+    selected = {
+        rename.source: rename.destination.name
+        for rename in report.renames
+        if rename.status == "proposed"
+    }
+
+    result = api.apply(
+        report,
+        selected,
+        history_dir=tmp_path / ".application-history",
+    )
+
+    clean_folder = tmp_path / "Gotham S04"
+    assert clean_folder.is_dir()
+    assert (clean_folder / "Gotham S04 E01.mkv").exists()
+    restored = api.undo(result.history_entry)
+    assert not restored.errors
+    assert restored.restored == 2
+    assert release.is_dir()
+    assert original_file.exists()
+
+
+def test_folder_move_failure_restores_file_and_folder_names(
+    tmp_path: Path,
+) -> None:
+    release = tmp_path / "Gotham.S04.1080p.x265-ZMNT"
+    release.mkdir()
+    original_file = release / "Gotham.S04E01.1080p.x265-ZMNT.mkv"
+    original_file.touch()
+    report = api.scan(api.ScanOptions(tmp_path))
+    selected = {
+        rename.source: rename.destination.name
+        for rename in report.renames
+        if rename.status == "proposed"
+    }
+    clean_folder = tmp_path / "Gotham S04"
+    real_replace = os.replace
+    failed_once = False
+
+    def fail_folder_destination(current: Path, destination: Path) -> None:
+        nonlocal failed_once
+        if Path(destination) == clean_folder and not failed_once:
+            failed_once = True
+            raise OSError("simulated folder move failure")
+        real_replace(current, destination)
+
+    with (
+        patch.object(core.os, "replace", side_effect=fail_folder_destination),
+        pytest.raises(OSError, match="simulated folder move failure"),
+    ):
+        api.apply(
+            report,
+            selected,
+            history_dir=tmp_path / ".application-history",
+        )
+
+    assert release.is_dir()
+    assert original_file.exists()
+    assert not clean_folder.exists()
+
+
+def test_manual_folder_name_does_not_require_original_suffix(
+    tmp_path: Path,
+) -> None:
+    release = tmp_path / "Gotham.S04.1080p.x265-ZMNT"
+    release.mkdir()
+    (release / "Gotham.S04E01.1080p.x265-ZMNT.mkv").touch()
+    report = api.scan(api.ScanOptions(tmp_path))
+    folder = next(
+        rename for rename in report.renames if rename.kind == "directory"
+    )
+
+    issues = api.validate_edits(report, {folder.source: "Gotham Season 4"})
+
+    assert not issues
+
+
+def test_selected_release_folder_can_rename_with_local_cli_history(
+    tmp_path: Path,
+) -> None:
+    release = tmp_path / "Gotham.S04.1080p.x265-ZMNT"
+    release.mkdir()
+    original_file = release / "Gotham.S04E01.1080p.x265-ZMNT.mkv"
+    original_file.touch()
+    report = api.scan(api.ScanOptions(release))
+    selected = {
+        rename.source: rename.destination.name
+        for rename in report.renames
+        if rename.status == "proposed"
+    }
+
+    result = api.apply(report, selected)
+
+    clean_folder = tmp_path / "Gotham S04"
+    assert clean_folder.is_dir()
+    assert result.history_entry.parent == clean_folder
+    restored = api.undo(result.history_entry)
+    assert not restored.errors
+    assert release.is_dir()
+    assert original_file.exists()
+    assert (release / result.history_entry.name).exists()
+
+
+def test_explicit_sidecar_deletion_follows_renamed_folder(
+    tmp_path: Path,
+) -> None:
+    release = tmp_path / "Gotham.S04.1080p.x265-ZMNT"
+    release.mkdir()
+    (release / "Gotham.S04E01.1080p.x265-ZMNT.mkv").touch()
+    poster = release / "poster.jpg"
+    poster.touch()
+    report = api.scan(
+        api.ScanOptions(tmp_path, include_sidecars=True)
+    )
+    selected = {
+        rename.source: rename.destination.name
+        for rename in report.renames
+        if rename.status == "proposed"
+    }
+
+    result = api.apply(
+        report,
+        selected,
+        delete_sidecars=True,
+        selected_sidecars={poster},
+        history_dir=tmp_path / ".application-history",
+    )
+
+    clean_folder = tmp_path / "Gotham S04"
+    assert clean_folder.is_dir()
+    assert not (clean_folder / "poster.jpg").exists()
+    restored = api.undo(result.history_entry)
+    assert not restored.errors
+    assert release.is_dir()
+    assert not poster.exists()

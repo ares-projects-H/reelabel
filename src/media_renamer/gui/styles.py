@@ -43,8 +43,12 @@ def stylesheet(dark: bool = True) -> str:
         font-size: 13px;
         color: {colors["text"]};
     }}
-    QMainWindow, QWidget#root {{
+    QMainWindow, QWidget#root, QDialog, QMessageBox {{
         background: {colors["window"]};
+    }}
+    QMessageBox QLabel#qt_msgbox_label,
+    QMessageBox QLabel#qt_msgbox_informativelabel {{
+        min-width: 420px;
     }}
     QFrame#card, QFrame#dropZone, QFrame#summaryCard {{
         background: {colors["surface"]};

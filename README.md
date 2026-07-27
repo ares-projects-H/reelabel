@@ -1,8 +1,9 @@
 # Media Renamer
 
 Media Renamer is a safe, offline desktop utility for cleaning movie, series,
-and subtitle filenames. It always previews proposed changes first, preserves
-media contents and folders, and refuses ambiguous or conflicting operations.
+subtitle filenames, and their containing release folders. It always previews
+proposed changes first, preserves media contents, and refuses ambiguous or
+conflicting operations.
 
 > Current milestone: functional alpha (validation 2). Use a copy of your media
 > while testing this development version.
@@ -17,8 +18,11 @@ The functional alpha includes:
 - movie, series, recursion, and extras options;
 - a cancellable background scan;
 - an editable before/after preview with working Ready, Review, and Ignored filters;
+- editable folder-name proposals for movies, series, and other media collections;
+- optional same-folder propagation after correcting a title or season pattern
+  in one episode proposal;
 - cross-platform filename, extension, path, and collision validation;
-- partial selection and transactional rename application;
+- partial selection and all-or-nothing rename application;
 - app-data history with safe Undo;
 - related image/NFO deletion shown only when requested, unchecked by default,
   and protected by a second confirmation.
@@ -53,7 +57,7 @@ Related images and NFO files are never proposed unless
 
 - No Internet access or analytics.
 - No media content changes.
-- No folder renaming.
+- Folder renames are always previewed, editable, and individually selectable.
 - No overwriting existing files.
 - No automatic image/NFO deletion.
 - Conflicts and uncertain subtitle matches are reported instead of guessed.

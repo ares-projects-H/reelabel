@@ -12,6 +12,10 @@ folders. Standalone installers are intentionally deferred to validation 3.
 - Cancel a long scan without changing files.
 - Filter the table with All, Ready, Review, and Ignored.
 - Uncheck individual proposals or edit a proposed filename.
+- Preview, edit, or uncheck cleaned movie, series, and collection folder names.
+- Correct a title or season pattern in one episode and optionally propagate it
+  to the other files in that same folder while preserving episode numbers and
+  subtitle suffixes.
 - Revalidate edits for unsupported Windows characters, reserved names,
   changed extensions, existing destinations, case collisions, duplicate
   destinations, and missing source files.
@@ -28,9 +32,19 @@ Always begin with a copied test folder.
 2. Select the correct media type and click **Preview changes**.
 3. Click each status filter and confirm that only matching rows remain visible.
 4. Uncheck one Ready row and edit another proposed name.
-5. Click **Apply selected changes** and verify only checked files changed.
-6. Open **History / Undo**, select the latest entry, and restore it.
-7. Run a second preview and confirm the original filenames returned.
+5. For a series, correct the title or remove an incorrect season from one
+   episode and review the offered same-folder updates.
+6. Review the proposed folder name.
+7. Click **Apply selected changes** and verify only checked items changed.
+8. Open **History / Undo**, select the latest entry, and restore it.
+9. Run a second preview and confirm the original file and folder names returned.
+
+## Confirmation
+
+The apply confirmation uses the Media Renamer logo for better contrast in dark
+mode and explains the safety behavior in plain language.
+
+![Media Renamer apply confirmation](screenshots/confirmation-preview.png)
 
 ## Current boundary
 
