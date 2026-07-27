@@ -1065,7 +1065,10 @@ class MainWindow(QMainWindow):
                 )
             except (OSError, json.JSONDecodeError):
                 history_payload = {}
-            result = api.undo(history_path)
+            result = api.undo(
+                history_path,
+                trusted_history_dir=self._history_dir(),
+            )
             if result.errors:
                 QMessageBox.critical(dialog, "Undo could not run", "\n".join(result.errors))
                 return

@@ -556,11 +556,9 @@ def build_report(root: Path, recursive: bool = True, only: str | None = None, in
             report.missing_subtitles.append((video.path, video.parsed.display()))
 
     _mark_conflicts(report)
-    changed_directories = {rename.source.parent for rename in report.renames if rename.status == "proposed"}
-    for directory in sorted(changed_directories):
-        for path in sorted(directory.iterdir()):
-            if path.is_file() and path.suffix.casefold() in SIDECAR_EXTENSIONS:
-                report.deletions.append(Deletion(path))
+    # This preserved CLI predates the desktop app's explicit sidecar-selection
+    # workflow. Keep it rename-only: images and NFO files are never queued for
+    # deletion automatically.
     return report
 
 

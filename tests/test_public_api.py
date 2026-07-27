@@ -56,7 +56,10 @@ def test_apply_selected_item_and_undo(tmp_path: Path) -> None:
     assert (tmp_path / target).exists()
     assert second.exists()
     assert result.history_entry.parent == history
-    restored = api.undo(result.history_entry)
+    restored = api.undo(
+        result.history_entry,
+        trusted_history_dir=history,
+    )
     assert restored.restored == 1
     assert not restored.errors
     assert first.exists()
@@ -148,7 +151,10 @@ def test_file_and_containing_folder_apply_and_undo_together(
     clean_folder = tmp_path / "Gotham S04"
     assert clean_folder.is_dir()
     assert (clean_folder / "Gotham S04 E01.mkv").exists()
-    restored = api.undo(result.history_entry)
+    restored = api.undo(
+        result.history_entry,
+        trusted_history_dir=result.history_entry.parent,
+    )
     assert not restored.errors
     assert restored.restored == 2
     assert release.is_dir()
@@ -229,7 +235,10 @@ def test_selected_release_folder_can_rename_with_local_cli_history(
     clean_folder = tmp_path / "Gotham S04"
     assert clean_folder.is_dir()
     assert result.history_entry.parent == clean_folder
-    restored = api.undo(result.history_entry)
+    restored = api.undo(
+        result.history_entry,
+        expected_scope=release,
+    )
     assert not restored.errors
     assert release.is_dir()
     assert original_file.exists()
@@ -264,7 +273,95 @@ def test_explicit_sidecar_deletion_follows_renamed_folder(
     clean_folder = tmp_path / "Gotham S04"
     assert clean_folder.is_dir()
     assert not (clean_folder / "poster.jpg").exists()
-    restored = api.undo(result.history_entry)
+    restored = api.undo(
+        result.history_entry,
+        trusted_history_dir=result.history_entry.parent,
+    )
     assert not restored.errors
     assert release.is_dir()
     assert not poster.exists()
+
+
+def test_scan_ignores_media_file_symlink_outside_selected_folder(
+    tmp_path: Path,
+) -> None:
+    selected = tmp_path / "selected"
+    outside = tmp_path / "outside"
+    selected.mkdir()
+    outside.mkdir()
+    target = _movie(outside, "External.Movie.2020.1080p.mkv")
+    link = selected / target.name
+    try:
+        link.symlink_to(target)
+    except OSError:
+        pytest.skip("Symbolic links are not available on this platform.")
+
+    report = api.scan(api.ScanOptions(selected))
+
+    assert not report.renames
+    assert target.exists()
+
+
+def test_apply_rejects_source_replaced_by_external_symlink(
+    tmp_path: Path,
+) -> None:
+    selected = tmp_path / "selected"
+    outside = tmp_path / "outside"
+    selected.mkdir()
+    outside.mkdir()
+    source = _movie(selected)
+    external = _movie(outside, "External.Movie.2020.1080p.mkv")
+    report = api.scan(api.ScanOptions(selected))
+    target_name = next(rename.destination.name for rename in report.renames)
+    source.unlink()
+    try:
+        source.symlink_to(external)
+    except OSError:
+        pytest.skip("Symbolic links are not available on this platform.")
+
+    with pytest.raises(api.InvalidEdits, match="symbolic link"):
+        api.apply(
+            report,
+            {source: target_name},
+            history_dir=tmp_path / ".application-history",
+        )
+
+    assert external.exists()
+
+
+def test_undo_requires_trusted_history_or_explicit_scope(tmp_path: Path) -> None:
+    record = tmp_path / "rename_undo_untrusted.json"
+    record.write_text(
+        '{"operations": [], "scope": "/"}',
+        encoding="utf-8",
+    )
+
+    result = api.undo(record)
+
+    assert result.restored == 0
+    assert any("trusted history" in error for error in result.errors)
+
+
+def test_undo_rejects_paths_outside_expected_scope(tmp_path: Path) -> None:
+    allowed = tmp_path / "allowed"
+    outside = tmp_path / "outside"
+    allowed.mkdir()
+    outside.mkdir()
+    external = outside / "external.mkv"
+    external.touch()
+    record = tmp_path / "rename_undo_forged.json"
+    record.write_text(
+        (
+            '{"operations": [{"status": "renamed", "kind": "file", '
+            f'"new_path": "{external}", '
+            f'"old_path": "{allowed / "captured.mkv"}"'
+            '}]}'
+        ),
+        encoding="utf-8",
+    )
+
+    result = api.undo(record, expected_scope=allowed)
+
+    assert result.restored == 0
+    assert any("hors du dossier" in error for error in result.errors)
+    assert external.exists()

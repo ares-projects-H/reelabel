@@ -471,7 +471,10 @@ def discover(
     for path in iterator:
         if cancelled is not None and cancelled():
             raise ScanCancelled("The scan was cancelled.")
-        if not path.is_file():
+        # File symlinks are deliberately excluded. Following one during
+        # validation or apply could turn an approved in-folder rename into a
+        # modification of an unrelated external target.
+        if path.is_symlink() or not path.is_file():
             continue
         suffix = path.suffix.casefold()
         if suffix in config["video_extensions"]:
@@ -764,6 +767,7 @@ def execute(
     desktop app passes its private data directory so library folders receive
     only the explicitly approved media-name changes.
     """
+    root = root.resolve()
     safe = [rename for rename in report.renames if rename.status == "proposed"]
     file_renames = [rename for rename in safe if rename.kind != "directory"]
     directory_renames = [
@@ -789,6 +793,23 @@ def execute(
         for rename in safe:
             if not rename.source.exists():
                 raise FileNotFoundError(f"source disparue depuis la planification: {rename.source}")
+            canonical_source = rename.source.resolve()
+            canonical_destination = rename.destination.resolve()
+            source_in_root = canonical_source.is_relative_to(root)
+            destination_in_root = canonical_destination.is_relative_to(root)
+            selected_root_folder_move = (
+                rename.kind == "directory"
+                and canonical_source == root
+                and canonical_destination.parent == root.parent
+            )
+            if (
+                rename.source.is_symlink()
+                or not source_in_root
+                or (not destination_in_root and not selected_root_folder_move)
+            ):
+                raise OSError(
+                    "une opération utilise un lien symbolique ou quitte le dossier sélectionné"
+                )
             if rename.kind == "directory" and not rename.source.is_dir():
                 raise NotADirectoryError(
                     f"le dossier planifié n'est plus un dossier: {rename.source}"
@@ -948,7 +969,12 @@ def execute(
                     }
                 )
     finally:
-        payload = {"created_at": datetime.now(timezone.utc).isoformat(), "operations": outcomes, "deletions": deletion_outcomes}
+        payload = {
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "scope": str(root),
+            "operations": outcomes,
+            "deletions": deletion_outcomes,
+        }
         if directory_commit_succeeded:
             log_path = _path_after_directory_renames(
                 log_path, directory_renames
@@ -968,15 +994,25 @@ def undo(undo_path: Path, scope: Path | None = None) -> tuple[int, list[str]]:
         for item in data.get("operations", [])
         if item.get("status") == "renamed"
     ]
-    if scope is not None:
-        resolved_scope = scope.resolve()
-        entries = [
-            item
-            for item in entries
-            if Path(item["old_path"]).resolve().is_relative_to(resolved_scope)
-        ]
-        if not entries:
-            return 0, [f"Aucune opération d'annulation dans le dossier: {resolved_scope}"]
+    if scope is None:
+        return 0, ["Une annulation exige le dossier média autorisé."]
+    resolved_scope = scope.expanduser().resolve()
+    allowed_roots = {resolved_scope}
+    for item in entries:
+        if item.get("kind") != "directory":
+            continue
+        old_path = Path(item["old_path"]).expanduser().absolute()
+        if old_path == resolved_scope:
+            allowed_roots.add(Path(item["new_path"]).expanduser().resolve())
+    for item in entries:
+        for path_key in ("old_path", "new_path"):
+            candidate = Path(item[path_key]).expanduser().resolve()
+            if not any(candidate.is_relative_to(root) for root in allowed_roots):
+                return 0, [
+                    f"Chemin hors du dossier autorisé dans le journal: {candidate}"
+                ]
+    if not entries:
+        return 0, [f"Aucune opération d'annulation dans le dossier: {resolved_scope}"]
 
     directory_operations = [
         (Path(item["new_path"]), Path(item["old_path"]))
@@ -1131,7 +1167,12 @@ def main(argv: list[str] | None = None) -> int:
         if args.undo_scope:
             count, errors = undo(Path(args.undo), args.undo_scope)
         else:
-            undo_result = public_api.undo(Path(args.undo))
+            if args.undo_scope is None:
+                parser.error("--undo exige --undo-scope pour autoriser le dossier restauré")
+            undo_result = public_api.undo(
+                Path(args.undo),
+                expected_scope=args.undo_scope,
+            )
             count, errors = undo_result.restored, list(undo_result.errors)
         print(f"Annulation: {count} fichier(s) restauré(s).")
         for error in errors:

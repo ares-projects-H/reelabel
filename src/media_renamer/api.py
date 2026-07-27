@@ -111,6 +111,21 @@ WINDOWS_RESERVED = {
 WINDOWS_INVALID_RE = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 
 
+def _absolute_path(path: Path) -> Path:
+    """Return an absolute path without following symbolic links."""
+
+    return Path(os.path.abspath(path))
+
+
+def _is_within(path: Path, root: Path) -> bool:
+    """Return whether a canonical path stays inside the approved root."""
+
+    try:
+        return path.is_relative_to(root)
+    except ValueError:
+        return False
+
+
 def scan(
     options: ScanOptions,
     cancelled: Callable[[], bool] | None = None,
@@ -150,17 +165,18 @@ def validate_edits(
     user.
     """
 
+    root = report.options.folder.resolve()
     proposed = {
-        rename.source.resolve(): rename
+        _absolute_path(rename.source): rename
         for rename in report.renames
         if rename.status == "proposed"
     }
-    selected_sources = {Path(source).resolve() for source in edits}
+    selected_sources = {_absolute_path(Path(source)) for source in edits}
     issues: list[ValidationIssue] = []
     destinations: dict[str, list[Path]] = defaultdict(list)
 
     for raw_source, raw_name in edits.items():
-        source = Path(raw_source).resolve()
+        source = _absolute_path(Path(raw_source))
         name = raw_name.strip()
         rename = proposed.get(source)
         if rename is None:
@@ -169,6 +185,18 @@ def validate_edits(
         is_directory = rename.kind == "directory"
         if not source.exists():
             issues.append(ValidationIssue(source, "The source item disappeared after the scan."))
+        else:
+            # A directory can be replaced by a symlink between Preview and
+            # Apply. Check the complete canonical source again so an in-folder
+            # link can never authorize a change to an external target.
+            canonical_source = source.resolve()
+            if source.is_symlink() or not _is_within(canonical_source, root):
+                issues.append(
+                    ValidationIssue(
+                        source,
+                        "The source uses a symbolic link or leaves the selected folder.",
+                    )
+                )
         if not name or name in {".", ".."}:
             issues.append(ValidationIssue(source, "The proposed filename is empty or invalid."))
             continue
@@ -194,16 +222,29 @@ def validate_edits(
             issues.append(ValidationIssue(source, "This filename is reserved by Windows."))
 
         destination = source.with_name(name)
-        key = os.path.normcase(str(destination.resolve())).casefold()
+        canonical_destination = destination.resolve()
+        root_folder_rename = (
+            is_directory
+            and source == root
+            and canonical_destination.parent == root.parent
+        )
+        if not root_folder_rename and not _is_within(canonical_destination, root):
+            issues.append(
+                ValidationIssue(
+                    source,
+                    "The destination leaves the selected folder.",
+                )
+            )
+        key = os.path.normcase(str(canonical_destination)).casefold()
         destinations[key].append(source)
 
-        if destination.exists() and destination.resolve() not in selected_sources:
+        if destination.exists() and _absolute_path(destination) not in selected_sources:
             issues.append(ValidationIssue(source, "A file already exists at the destination."))
         else:
             try:
                 sibling_collision = any(
                     sibling.name.casefold() == name.casefold()
-                    and sibling.resolve() not in selected_sources
+                    and _absolute_path(sibling) not in selected_sources
                     for sibling in source.parent.iterdir()
                 )
             except OSError as exc:
@@ -248,12 +289,12 @@ def apply(
         subtitles_found=report.engine_report.subtitles_found,
     )
     proposed = {
-        rename.source.resolve(): rename
+        _absolute_path(rename.source): rename
         for rename in report.renames
         if rename.status == "proposed"
     }
     for source, filename in selected_items.items():
-        resolved = Path(source).resolve()
+        resolved = _absolute_path(Path(source))
         operation.renames.append(
             core.Rename(
                 source=resolved,
@@ -283,14 +324,39 @@ def apply(
     )
 
 
-def undo(history_entry: Path) -> UndoResult:
-    """Restore a completed history entry without overwriting existing files."""
+def undo(
+    history_entry: Path,
+    *,
+    trusted_history_dir: Path | None = None,
+    expected_scope: Path | None = None,
+) -> UndoResult:
+    """Restore a history entry without trusting paths from arbitrary JSON.
 
-    history_entry = Path(history_entry)
+    The desktop interface supplies its private history directory. Advanced
+    callers and the CLI must instead supply the exact media root that the
+    record is allowed to restore.
+    """
+
+    history_entry = _absolute_path(Path(history_entry))
+    if trusted_history_dir is None and expected_scope is None:
+        return UndoResult(
+            0,
+            (
+                "Undo requires a trusted history directory or an explicit "
+                "expected media folder.",
+            ),
+        )
+    if trusted_history_dir is not None:
+        trusted = Path(trusted_history_dir).expanduser().resolve()
+        if history_entry.parent.resolve() != trusted:
+            return UndoResult(0, ("This history entry is outside the trusted history folder.",))
     data = json.loads(history_entry.read_text(encoding="utf-8"))
     if data.get("undone_at"):
         return UndoResult(0, ("This history entry has already been undone.",))
-    restored, errors = core.undo(history_entry)
+    scope_value = expected_scope or data.get("scope")
+    if scope_value is None:
+        return UndoResult(0, ("This history entry does not record an authorized media folder.",))
+    restored, errors = core.undo(history_entry, scope=Path(scope_value))
     if not errors:
         from datetime import datetime, timezone
 
