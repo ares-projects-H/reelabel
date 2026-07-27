@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Media Renamer — Interface Preview</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --window: #0b1020;
+      --surface: #11182b;
+      --surface-2: #17213a;
+      --border: #263553;
+      --text: #f5f7ff;
+      --muted: #9aa8c7;
+      --accent: #2bc7f2;
+      --positive: #41d39a;
+      --warning: #ffbe55;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-width: 1100px;
+      background: var(--window);
+      color: var(--text);
+      font: 13px/1.45 Inter, "Segoe UI", system-ui, sans-serif;
+    }
+    main { max-width: 1280px; margin: auto; padding: 22px 28px 20px; }
+    header { display: flex; align-items: center; gap: 12px; }
+    header img { width: 44px; height: 44px; object-fit: contain; }
+    header strong { font-size: 20px; }
+    header span { margin-left: auto; color: var(--muted); font-size: 11px; }
+    .intro { margin: 24px 0 18px; }
+    .eyebrow { color: var(--accent); font-size: 11px; font-weight: 800; letter-spacing: .08em; }
+    h1 { margin: 4px 0 2px; font-size: 29px; line-height: 1.2; }
+    p { margin: 0; color: var(--muted); }
+    .card {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      border-radius: 14px;
+    }
+    .picker { padding: 14px 16px; }
+    .drop {
+      display: flex;
+      align-items: center;
+      min-height: 92px;
+      padding: 14px 18px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      gap: 13px;
+    }
+    .plus {
+      display: grid; place-items: center; width: 42px; height: 42px;
+      border-radius: 50%; background: rgb(43 199 242 / 14%);
+      color: var(--accent); font-size: 26px; font-weight: 300;
+    }
+    .drop b { display: block; font-size: 14px; }
+    .controls { display: grid; grid-template-columns: 2fr auto 1fr auto; gap: 10px; margin-top: 10px; }
+    .subcontrols { display: flex; gap: 24px; margin-top: 11px; }
+    input[type=text], select, button {
+      height: 38px; border: 1px solid var(--border); border-radius: 8px;
+      background: var(--surface-2); color: var(--text); padding: 0 11px;
+    }
+    button { font-weight: 700; padding: 0 15px; }
+    button.primary { background: var(--accent); color: #07101d; border: 0; }
+    button[disabled] { background: var(--border); color: var(--muted); }
+    input[type=checkbox] { accent-color: var(--accent); }
+    .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 13px 0; }
+    .metric { padding: 10px 14px; }
+    .metric b { display: block; font-size: 22px; }
+    .metric small { color: var(--muted); font-weight: 700; }
+    .filters { display: flex; align-items: center; gap: 6px; margin-bottom: 9px; }
+    .filters button { height: 34px; color: var(--muted); }
+    .filters button.active { color: var(--text); }
+    .filters label { margin-left: auto; color: var(--muted); }
+    .table-wrap { overflow: hidden; }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    th {
+      color: var(--muted); font-size: 11px; text-align: left;
+      padding: 11px 9px; border-bottom: 1px solid var(--border);
+    }
+    td { padding: 9px; border-bottom: 1px solid var(--border); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    tr:nth-child(even) { background: var(--surface-2); }
+    .ready { color: var(--positive); font-weight: 700; }
+    .review { color: var(--warning); font-weight: 700; }
+    td[contenteditable=true] { outline: none; }
+    td[contenteditable=true]:focus { box-shadow: inset 0 0 0 1px var(--accent); }
+    footer { display: flex; align-items: center; margin-top: 13px; }
+    .safe {
+      padding: 8px 12px; border: 1px solid rgb(65 211 154 / 35%);
+      background: rgb(65 211 154 / 12%); color: var(--positive);
+      border-radius: 8px; font-weight: 700;
+    }
+    footer button { margin-left: auto; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <img src="../assets/media-renamer-icon.png" alt="">
+      <strong>Media Renamer</strong>
+      <span>INTERFACE PREVIEW</span>
+    </header>
+    <section class="intro">
+      <div class="eyebrow">SAFE · LOCAL · OFFLINE</div>
+      <h1>Rename media files with confidence</h1>
+      <p>Preview every change, edit proposed names, and apply only what you approve.</p>
+    </section>
+    <section class="card picker">
+      <div class="drop">
+        <div class="plus">+</div>
+        <div><b>Drop a media folder here</b><p>or use Browse — files are only previewed</p></div>
+      </div>
+      <div class="controls">
+        <input type="text" value="/Media/Library" aria-label="Selected media folder">
+        <button>Browse</button>
+        <select aria-label="Media type"><option>All media</option><option>Movies only</option><option>Series only</option></select>
+        <button class="primary">Preview changes</button>
+      </div>
+      <div class="subcontrols">
+        <label><input type="checkbox" checked> Include subfolders</label>
+        <label><input type="checkbox"> Include extras</label>
+      </div>
+    </section>
+    <section class="metrics">
+      <div class="card metric"><b>42</b><small>FILES FOUND</small></div>
+      <div class="card metric"><b>34</b><small>READY</small></div>
+      <div class="card metric"><b>2</b><small>REVIEW</small></div>
+      <div class="card metric"><b>6</b><small>IGNORED</small></div>
+    </section>
+    <nav class="filters">
+      <button class="active">All 42</button><button>Ready 34</button><button>Review 2</button><button>Ignored 6</button>
+      <label><input type="checkbox"> Include related images / NFO</label>
+    </nav>
+    <section class="card table-wrap">
+      <table>
+        <colgroup><col style="width:70px"><col style="width:82px"><col><col><col style="width:65px"></colgroup>
+        <thead><tr><th>Include</th><th>Status</th><th>Original name</th><th>Proposed name</th><th>Type</th></tr></thead>
+        <tbody>
+          <tr><td>✓</td><td class="ready">Ready</td><td>[MagicStar] Jikou Keisatsu 2019 Fukkatsu SP WEB-DL.mkv</td><td contenteditable="true">Jikou Keisatsu 2019 Fukkatsu SP.mkv</td><td>MKV</td></tr>
+          <tr><td>✓</td><td class="ready">Ready</td><td>Always.Sunset.on.Third.Street.2005.1080p.BluRay.x264.mkv</td><td contenteditable="true">Always Sunset on Third Street (2005).mkv</td><td>MKV</td></tr>
+          <tr><td>✓</td><td class="ready">Ready</td><td>Campaign.2007.DVDRip.XviD.AC3.Glaeken.CG.avi</td><td contenteditable="true">Campaign (2007).avi</td><td>AVI</td></tr>
+          <tr><td>✓</td><td class="ready">Ready</td><td>Campaign.2007.DVDRip.XviD.AC3.Glaeken.CG.idx</td><td contenteditable="true">Campaign (2007).idx</td><td>IDX</td></tr>
+          <tr><td>✓</td><td class="ready">Ready</td><td>Campaign.2007.DVDRip.XviD.AC3.Glaeken.CG.sub</td><td contenteditable="true">Campaign (2007).sub</td><td>SUB</td></tr>
+          <tr><td>✓</td><td class="ready">Ready</td><td>Toumei.na.Yurikago.EP01.1080p.NF.WEB-DL.DDP2.0.H.264-MagicStar.mkv</td><td contenteditable="true">Toumei na Yurikago S01 E01.mkv</td><td>MKV</td></tr>
+          <tr><td>✓</td><td class="ready">Ready</td><td>Toumei.na.Yurikago.EP01.1080p.NF.WEB-DL.DDP2.0.H.264-MagicStar.ass</td><td contenteditable="true">Toumei na Yurikago S01 E01.ass</td><td>ASS</td></tr>
+          <tr><td>—</td><td class="review">Review</td><td>Again - English subtitles [ATKC][8680D185].mkv</td><td contenteditable="true">Again - English Subtitles.mkv</td><td>MKV</td></tr>
+        </tbody>
+      </table>
+    </section>
+    <footer>
+      <div class="safe">✓ Prototype mode — no files can be changed</div>
+      <button disabled>Apply selected changes</button>
+    </footer>
+  </main>
+</body>
+</html>
