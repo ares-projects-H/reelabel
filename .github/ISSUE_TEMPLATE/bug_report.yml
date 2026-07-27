@@ -1,0 +1,47 @@
+name: Bug report
+description: Report incorrect behavior or a packaging problem
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not test destructive behavior on your only copy of a media folder.
+        Remove private paths or filenames if they are not needed.
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Windows 10/11 x64
+        - macOS Apple Silicon
+        - macOS Intel
+        - Linux x86_64
+        - Source development
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Media Renamer version
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: What happened?
+      description: Include the steps, expected result, and actual result.
+    validations:
+      required: true
+  - type: textarea
+    id: examples
+    attributes:
+      label: Safe filename examples
+      description: Add sanitized original and proposed names if relevant.
+      render: text
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Remove private information before attaching anything.

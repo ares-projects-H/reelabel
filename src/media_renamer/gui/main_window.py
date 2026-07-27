@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -140,8 +141,11 @@ DEMO_ROWS = (
 
 
 def project_asset(name: str) -> Path:
-    """Resolve an asset while running from the source checkout."""
+    """Resolve an asset from source or a PyInstaller application bundle."""
 
+    bundle_root = getattr(sys, "_MEIPASS", None)
+    if bundle_root:
+        return Path(bundle_root) / "assets" / name
     return Path(__file__).resolve().parents[3] / "assets" / name
 
 

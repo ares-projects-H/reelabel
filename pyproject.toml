@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "media-renamer"
-version = "0.1.0.dev0"
+version = "0.1.0"
 description = "A safe, offline desktop app for previewing and renaming local media files."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -29,7 +29,10 @@ dev = [
   "pytest-qt>=4.4,<5",
   "ruff>=0.9,<1",
 ]
-build = ["pyinstaller>=6.10,<7"]
+build = [
+  "pyinstaller>=6.10,<7",
+  "pillow>=11,<13",
+]
 
 [project.scripts]
 media-renamer = "media_renamer.cli:main"

@@ -5,8 +5,8 @@ subtitle filenames, and their containing release folders. It always previews
 proposed changes first, preserves media contents, and refuses ambiguous or
 conflicting operations.
 
-> Current milestone: functional alpha (validation 2). Use a copy of your media
-> while testing this development version.
+> Current milestone: packaging and publication (validation 3). Version 0.1.0
+> is an unsigned public alpha, so begin with a copied test folder.
 
 ## Interface preview
 
@@ -27,6 +27,19 @@ The functional alpha includes:
 - related image/NFO deletion shown only when requested, unchecked by default,
   and protected by a second confirmation.
 
+## Install
+
+Download the package for your platform from the
+[latest GitHub release](https://github.com/ares-projects-H/media-renamer/releases/latest):
+
+- Windows 10/11 x64: installer EXE;
+- macOS Apple Silicon or Intel: the matching DMG;
+- Linux x86_64: AppImage.
+
+The first release is unsigned, so Windows SmartScreen or macOS Gatekeeper may
+show a warning. Check the download against `SHA256SUMS.txt` and follow the
+[installation guide](docs/installation.md).
+
 ## Run from source
 
 ```bash
@@ -37,8 +50,8 @@ media-renamer-gui
 ```
 
 On Windows, activate the environment with `.venv\Scripts\activate`.
-The source version still needs Python; the standalone installers are planned
-for validation 3.
+Only source development requires Python; packaged users do not need Python or
+Codex.
 
 ## Command line
 
@@ -67,8 +80,13 @@ Related images and NFO files are never proposed unless
 
 - [Validation 1 — interface prototype](docs/validation-1.md)
 - [Validation 2 — functional alpha](docs/validation-2.md)
-- Validation 3 — Windows 10/11 x64 EXE, macOS DMGs, Linux AppImage, and
-  GitHub release (not started yet)
+- [Validation 3 — installers and GitHub release](docs/validation-3.md)
+
+## Contributing and security
+
+Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) before
+opening a pull request. Please report security problems privately using the
+instructions in [SECURITY.md](SECURITY.md).
 
 ## License
 

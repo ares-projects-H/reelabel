@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Media Renamer
+Comment=Safely preview and rename local media files
+Exec=media-renamer
+Icon=media-renamer
+Categories=AudioVideo;Utility;
+Terminal=false

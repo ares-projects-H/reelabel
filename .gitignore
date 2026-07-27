@@ -7,4 +7,6 @@ __pycache__/
 .ruff_cache/
 build/
 dist/
+release/
 *.spec
+!packaging/media-renamer.spec
