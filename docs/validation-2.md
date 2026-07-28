@@ -4,7 +4,7 @@ This checkpoint connects the approved interface to the local rename engine.
 The source build is ready for controlled testing on copies of real media
 folders. Standalone installers are intentionally deferred to validation 3.
 
-![Media Renamer application preview](screenshots/application-preview.png)
+![Reelabel application preview](screenshots/application-preview.png)
 
 ## What now works
 
@@ -43,10 +43,10 @@ Always begin with a copied test folder.
 
 ## Confirmation
 
-The apply confirmation uses the Media Renamer logo for better contrast in dark
+The apply confirmation uses the Reelabel logo for better contrast in dark
 mode and explains the safety behavior in plain language.
 
-![Media Renamer apply confirmation](screenshots/confirmation-preview.png)
+![Reelabel apply confirmation](screenshots/confirmation-preview.png)
 
 ## Current boundary
 

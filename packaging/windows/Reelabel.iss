@@ -1,9 +1,9 @@
 ; Inno Setup definition for the unsigned Windows 10/11 x64 installer.
 
-#define MyAppName "Media Renamer"
+#define MyAppName "Reelabel"
 #define MyAppVersion "0.1.0"
 #define MyAppPublisher "ares-projects-H"
-#define MyAppExeName "Media Renamer.exe"
+#define MyAppExeName "Reelabel.exe"
 
 [Setup]
 AppId={{25FEFCE4-675C-49E4-ADE2-8512050106E0}
@@ -17,8 +17,8 @@ ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0
 PrivilegesRequired=lowest
 OutputDir=..\..\release
-OutputBaseFilename=Media-Renamer-{#MyAppVersion}-Windows-x64-Setup
-SetupIconFile=..\..\assets\media-renamer-icon.ico
+OutputBaseFilename=Reelabel-{#MyAppVersion}-Windows-x64-Setup
+SetupIconFile=..\..\assets\reelabel-icon.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 Compression=lzma2
 SolidCompression=yes
@@ -31,7 +31,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional shortcuts:"
 
 [Files]
-Source: "..\..\dist\Media Renamer\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\..\dist\Reelabel\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"

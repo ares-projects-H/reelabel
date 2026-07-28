@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
-from media_renamer import api, core
+from reelabel import api, core
 
 
 def _movie(root: Path, name: str = "Campaign.2007.DVDRip.XviD.AC3.mkv") -> Path:

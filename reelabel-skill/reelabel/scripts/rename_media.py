@@ -4,8 +4,8 @@
 Use --dry-run first.  This program never needs network access and never
 changes media contents; --apply only renames files that passed all checks.
 """
-from media_renamer.core import main
 
+from reelabel.core import main
 
 if __name__ == "__main__":
     raise SystemExit(main())

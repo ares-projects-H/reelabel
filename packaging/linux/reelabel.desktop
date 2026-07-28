@@ -1,8 +1,8 @@
 [Desktop Entry]
 Type=Application
-Name=Media Renamer
+Name=Reelabel
 Comment=Safely preview and rename local media files
-Exec=media-renamer
-Icon=media-renamer
+Exec=reelabel
+Icon=reelabel
 Categories=AudioVideo;Utility;
 Terminal=false

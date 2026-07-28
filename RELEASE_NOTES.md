@@ -1,6 +1,6 @@
-# Media Renamer v0.1.0
+# Reelabel v0.1.0
 
-First public release of the offline Media Renamer desktop application.
+First public release of the offline Reelabel desktop application.
 
 ## Highlights
 
@@ -12,10 +12,10 @@ First public release of the offline Media Renamer desktop application.
 
 ## Downloads
 
-- **Windows 10/11 x64:** `Media-Renamer-0.1.0-Windows-x64-Setup.exe`
-- **macOS Apple Silicon:** `Media-Renamer-0.1.0-macOS-arm64.dmg`
-- **macOS Intel:** `Media-Renamer-0.1.0-macOS-x86_64.dmg`
-- **Linux x86_64:** `Media-Renamer-0.1.0-Linux-x86_64.AppImage`
+- **Windows 10/11 x64:** `Reelabel-0.1.0-Windows-x64-Setup.exe`
+- **macOS Apple Silicon:** `Reelabel-0.1.0-macOS-arm64.dmg`
+- **macOS Intel:** `Reelabel-0.1.0-macOS-x86_64.dmg`
+- **Linux x86_64:** `Reelabel-0.1.0-Linux-x86_64.AppImage`
 
 These first installers are unsigned. Windows SmartScreen or macOS Gatekeeper
 may show a warning. Verify the matching SHA-256 value in `SHA256SUMS.txt`

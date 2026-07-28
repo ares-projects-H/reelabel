@@ -1,4 +1,4 @@
-"""Main window for the Media Renamer desktop application."""
+"""Main window for the Reelabel desktop application."""
 
 from __future__ import annotations
 
@@ -35,7 +35,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from media_renamer import api, core
+from reelabel import api, core
 
 from .styles import stylesheet
 
@@ -225,10 +225,10 @@ class MainWindow(QMainWindow):
 
     def __init__(self, demo: bool = False) -> None:
         super().__init__()
-        self.setWindowTitle("Media Renamer")
+        self.setWindowTitle("Reelabel")
         self.setMinimumSize(1040, 700)
         self.resize(1280, 820)
-        icon_path = project_asset("media-renamer-icon.png")
+        icon_path = project_asset("reelabel-icon.png")
         if icon_path.exists():
             self.setWindowIcon(QIcon(str(icon_path)))
 
@@ -378,7 +378,7 @@ class MainWindow(QMainWindow):
     def _header(self) -> QHBoxLayout:
         header = QHBoxLayout()
         icon_label = QLabel()
-        icon = QPixmap(str(project_asset("media-renamer-icon.png")))
+        icon = QPixmap(str(project_asset("reelabel-icon.png")))
         if not icon.isNull():
             icon_label.setPixmap(
                 icon.scaled(
@@ -388,7 +388,7 @@ class MainWindow(QMainWindow):
                     Qt.TransformationMode.SmoothTransformation,
                 )
             )
-        brand = QLabel("Media Renamer")
+        brand = QLabel("Reelabel")
         brand.setObjectName("brand")
         history = QPushButton("History / Undo")
         history.clicked.connect(self._show_history)
@@ -842,7 +842,7 @@ class MainWindow(QMainWindow):
 
         message = QMessageBox(self)
         message.setWindowTitle(title)
-        logo = QPixmap(str(project_asset("media-renamer-icon.png")))
+        logo = QPixmap(str(project_asset("reelabel-icon.png")))
         if not logo.isNull():
             message.setIconPixmap(
                 logo.scaled(
@@ -953,7 +953,7 @@ class MainWindow(QMainWindow):
         if not self._confirm_action(
             "Apply selected changes?",
             f"Rename {' and '.join(parts)}?",
-            "Media Renamer will check every destination again before making changes. "
+            "Reelabel will check every destination again before making changes. "
             "If any rename fails, completed changes are automatically restored. "
             "A History / Undo entry will be saved.",
             "Rename selected items",

@@ -12,18 +12,18 @@ VERSION = PROJECT_DATA["project"]["version"]
 ASSETS = PROJECT_ROOT / "assets"
 
 if sys.platform == "darwin":
-    APP_ICON = ASSETS / "media-renamer-icon.icns"
+    APP_ICON = ASSETS / "reelabel-icon.icns"
 elif sys.platform == "win32":
-    APP_ICON = ASSETS / "media-renamer-icon.ico"
+    APP_ICON = ASSETS / "reelabel-icon.ico"
 else:
-    APP_ICON = ASSETS / "media-renamer-icon.png"
+    APP_ICON = ASSETS / "reelabel-icon.png"
 
 a = Analysis(
     [str(PROJECT_ROOT / "packaging" / "entrypoint.py")],
     pathex=[str(PROJECT_ROOT / "src")],
     binaries=[],
     datas=[
-        (str(ASSETS / "media-renamer-icon.png"), "assets"),
+        (str(ASSETS / "reelabel-icon.png"), "assets"),
     ],
     hiddenimports=[],
     hookspath=[],
@@ -40,7 +40,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name="Media Renamer",
+    name="Reelabel",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -56,17 +56,17 @@ collection = COLLECT(
     strip=False,
     upx=False,
     upx_exclude=[],
-    name="Media Renamer",
+    name="Reelabel",
 )
 
 if sys.platform == "darwin":
     app = BUNDLE(
         collection,
-        name="Media Renamer.app",
+        name="Reelabel.app",
         icon=str(APP_ICON),
-        bundle_identifier="com.aresprojectsh.mediarenamer",
+        bundle_identifier="com.aresprojectsh.reelabel",
         info_plist={
-            "CFBundleDisplayName": "Media Renamer",
+            "CFBundleDisplayName": "Reelabel",
             "CFBundleShortVersionString": VERSION,
             "CFBundleVersion": VERSION,
             "LSMinimumSystemVersion": "11.0",

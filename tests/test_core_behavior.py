@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from media_renamer.core import (
+from reelabel.core import (
     build_report,
     normalize_folder_name,
     parse_media_name,

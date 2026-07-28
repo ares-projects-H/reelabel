@@ -1,6 +1,6 @@
 # Validation 3 — Installers and publication
 
-This checkpoint packages Media Renamer as a standalone application and
+This checkpoint packages Reelabel as a standalone application and
 publishes version 0.1.0 from GitHub Actions.
 
 ## Deliverables
@@ -18,9 +18,9 @@ publishes version 0.1.0 from GitHub Actions.
 The source launcher sets the icon on both Qt's application object and the
 native main window. Packaged builds also embed:
 
-- `media-renamer-icon.ico` in Windows executables and the installer;
-- `media-renamer-icon.icns` in the macOS application bundle;
-- `media-renamer-icon.png` in the Linux AppImage.
+- `reelabel-icon.ico` in Windows executables and the installer;
+- `reelabel-icon.icns` in the macOS application bundle;
+- `reelabel-icon.png` in the Linux AppImage.
 
 ## Signing status
 

@@ -1,4 +1,4 @@
-"""Allow ``python -m media_renamer`` to launch the command-line interface."""
+"""Allow ``python -m reelabel`` to launch the command-line interface."""
 
 from .cli import main
 

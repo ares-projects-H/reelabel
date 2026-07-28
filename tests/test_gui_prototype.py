@@ -12,9 +12,9 @@ if PYSIDE_AVAILABLE:
     from PySide6.QtCore import Qt
     from PySide6.QtWidgets import QApplication
 
-    from media_renamer import api
-    from media_renamer.gui.main_window import DEMO_ROWS, MainWindow
-    from media_renamer.gui.styles import stylesheet
+    from reelabel import api
+    from reelabel.gui.main_window import DEMO_ROWS, MainWindow
+    from reelabel.gui.styles import stylesheet
 
 
 @unittest.skipUnless(PYSIDE_AVAILABLE, "PySide6 is not installed")
@@ -25,7 +25,7 @@ class GuiPrototypeTests(unittest.TestCase):
 
     def test_prototype_loads_demo_rows(self) -> None:
         window = MainWindow(demo=True)
-        self.assertEqual(window.windowTitle(), "Media Renamer")
+        self.assertEqual(window.windowTitle(), "Reelabel")
         self.assertEqual(window.table.rowCount(), len(DEMO_ROWS))
         self.assertFalse(window.apply_button.isEnabled())
         self.assertFalse(window.sidecars.isChecked())

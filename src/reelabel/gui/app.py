@@ -1,4 +1,4 @@
-"""Launch the Media Renamer desktop interface."""
+"""Launch the Reelabel desktop interface."""
 
 from __future__ import annotations
 
@@ -15,11 +15,11 @@ from .main_window import MainWindow, project_asset
 def main() -> int:
     """Run the Qt event loop."""
     application = QApplication.instance() or QApplication(sys.argv)
-    application.setApplicationName("Media Renamer")
+    application.setApplicationName("Reelabel")
     application.setOrganizationName("ares-projects-H")
     # No font family is forced: Qt uses the platform's native application font
     # (San Francisco, Segoe UI, or the configured Linux desktop font).
-    icon = QIcon(str(project_asset("media-renamer-icon.png")))
+    icon = QIcon(str(project_asset("reelabel-icon.png")))
     if not icon.isNull():
         application.setWindowIcon(icon)
     window = MainWindow(demo=False)
@@ -30,7 +30,7 @@ def main() -> int:
         window.windowHandle().setIcon(icon)
     # Package workflows use this local-only switch to verify that the bundled
     # GUI starts without Python being installed on the target system.
-    if os.environ.get("MEDIA_RENAMER_SMOKE_TEST") == "1":
+    if os.environ.get("REELABEL_SMOKE_TEST") == "1":
         QTimer.singleShot(1000, application.quit)
     return application.exec()
 

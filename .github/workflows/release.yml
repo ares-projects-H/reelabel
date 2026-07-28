@@ -33,14 +33,14 @@ jobs:
         run: python -m pip install -e ".[build]"
 
       - name: Build application
-        run: pyinstaller --noconfirm --clean packaging/media-renamer.spec
+        run: pyinstaller --noconfirm --clean packaging/reelabel.spec
 
       - name: Smoke-test packaged application
         shell: pwsh
         run: |
-          $env:MEDIA_RENAMER_SMOKE_TEST = "1"
+          $env:REELABEL_SMOKE_TEST = "1"
           $env:QT_QPA_PLATFORM = "offscreen"
-          & ".\dist\Media Renamer\Media Renamer.exe"
+          & ".\dist\Reelabel\Reelabel.exe"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Install Inno Setup
@@ -49,12 +49,12 @@ jobs:
       - name: Build installer
         shell: pwsh
         run: |
-          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "packaging\windows\MediaRenamer.iss"
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "packaging\windows\Reelabel.iss"
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: windows-x64
-          path: release/Media-Renamer-0.1.0-Windows-x64-Setup.exe
+          path: release/Reelabel-0.1.0-Windows-x64-Setup.exe
           if-no-files-found: error
 
   macos:
@@ -83,12 +83,12 @@ jobs:
         run: python -m pip install -e ".[build]"
 
       - name: Build application
-        run: pyinstaller --noconfirm --clean packaging/media-renamer.spec
+        run: pyinstaller --noconfirm --clean packaging/reelabel.spec
 
       - name: Smoke-test packaged application
         run: |
-          MEDIA_RENAMER_SMOKE_TEST=1 QT_QPA_PLATFORM=offscreen \
-            "dist/Media Renamer.app/Contents/MacOS/Media Renamer"
+          REELABEL_SMOKE_TEST=1 QT_QPA_PLATFORM=offscreen \
+            "dist/Reelabel.app/Contents/MacOS/Reelabel"
 
       - name: Build DMG
         run: packaging/macos/build_dmg.sh "$VERSION" "${{ matrix.architecture }}"
@@ -96,7 +96,7 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: macos-${{ matrix.architecture }}
-          path: release/Media-Renamer-0.1.0-macOS-${{ matrix.architecture }}.dmg
+          path: release/Reelabel-0.1.0-macOS-${{ matrix.architecture }}.dmg
           if-no-files-found: error
 
   linux:
@@ -122,12 +122,12 @@ jobs:
         run: python -m pip install -e ".[build]"
 
       - name: Build application
-        run: pyinstaller --noconfirm --clean packaging/media-renamer.spec
+        run: pyinstaller --noconfirm --clean packaging/reelabel.spec
 
       - name: Smoke-test packaged directory
         run: |
-          MEDIA_RENAMER_SMOKE_TEST=1 QT_QPA_PLATFORM=offscreen \
-            "dist/Media Renamer/Media Renamer"
+          REELABEL_SMOKE_TEST=1 QT_QPA_PLATFORM=offscreen \
+            "dist/Reelabel/Reelabel"
 
       - name: Download AppImage tooling
         run: |
@@ -143,14 +143,14 @@ jobs:
 
       - name: Smoke-test AppImage
         run: |
-          MEDIA_RENAMER_SMOKE_TEST=1 QT_QPA_PLATFORM=offscreen \
-            release/Media-Renamer-0.1.0-Linux-x86_64.AppImage \
+          REELABEL_SMOKE_TEST=1 QT_QPA_PLATFORM=offscreen \
+            release/Reelabel-0.1.0-Linux-x86_64.AppImage \
             --appimage-extract-and-run
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: linux-x86_64
-          path: release/Media-Renamer-0.1.0-Linux-x86_64.AppImage
+          path: release/Reelabel-0.1.0-Linux-x86_64.AppImage
           if-no-files-found: error
 
   release:
@@ -181,5 +181,5 @@ jobs:
         run: |
           gh release create "$GITHUB_REF_NAME" \
             release-assets/* \
-            --title "Media Renamer $GITHUB_REF_NAME" \
+            --title "Reelabel $GITHUB_REF_NAME" \
             --notes-file RELEASE_NOTES.md

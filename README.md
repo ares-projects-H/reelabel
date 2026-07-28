@@ -1,6 +1,6 @@
-# Media Renamer
+# Reelabel
 
-Media Renamer is a safe, offline desktop utility for cleaning the names of
+Reelabel is a safe, offline desktop utility for cleaning the names of
 movie, series, and subtitle files, as well as their containing release folders.
 It always previews proposed changes first, preserves media contents, and
 refuses ambiguous or conflicting operations.
@@ -10,9 +10,9 @@ refuses ambiguous or conflicting operations.
 
 ## Interface preview
 
-![Media Renamer application preview](docs/screenshots/application-preview.png)
+![Reelabel application preview](docs/screenshots/application-preview.png)
 
-Media Renamer includes:
+Reelabel includes:
 
 - folder selection and drag-and-drop;
 - movie, series, recursion, and extras options;
@@ -32,7 +32,7 @@ Media Renamer includes:
 ## Install the app
 
 When version 0.1.0 is published, download the package for your platform from the
-[latest GitHub release](https://github.com/ares-projects-H/media-renamer/releases/latest):
+[latest GitHub release](https://github.com/ares-projects-H/reelabel/releases/latest):
 
 - Windows 10/11 x64: installer EXE;
 - macOS Apple Silicon or Intel: the matching DMG;
@@ -45,7 +45,7 @@ explains how to do this on each system.
 
 ## First use
 
-1. Open Media Renamer.
+1. Open Reelabel.
 2. Drag a media folder into the window, or click **Browse**.
 3. Choose **All media**, **Movies only**, or **Series only**.
 4. Click **Preview changes**. No files are changed during this step.
@@ -64,7 +64,7 @@ want to modify the source code.
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install -e ".[dev]"
-media-renamer-gui
+reelabel-gui
 ```
 
 On Windows, activate the environment with `.venv\Scripts\activate`.
@@ -73,13 +73,13 @@ Codex.
 
 ## Optional command line
 
-Media Renamer also provides a command-line workflow for users who prefer a
+Reelabel also provides a command-line workflow for users who prefer a
 terminal:
 
 ```bash
-media-renamer --dry-run "/path/to/media"
-media-renamer --apply "/path/to/media"
-media-renamer --undo "/path/to/rename_undo_TIMESTAMP.json"
+reelabel --dry-run "/path/to/media"
+reelabel --apply "/path/to/media"
+reelabel --undo "/path/to/rename_undo_TIMESTAMP.json"
 ```
 
 Related images and NFO files are never proposed unless
@@ -109,4 +109,4 @@ instructions in [SECURITY.md](SECURITY.md).
 
 ## License
 
-Media Renamer is available under the [MIT License](LICENSE).
+Reelabel is available under the [MIT License](LICENSE).
