@@ -67,6 +67,10 @@ class GuiPrototypeTests(unittest.TestCase):
     def test_theme_uses_the_platform_font(self) -> None:
         self.assertNotIn("Inter", stylesheet())
 
+    def test_header_dividers_are_visible_in_both_themes(self) -> None:
+        self.assertIn("border-right: 1px solid #435476;", stylesheet(dark=True))
+        self.assertIn("border-right: 1px solid #b6c3d6;", stylesheet(dark=False))
+
     def test_native_application_menu_roles_exist(self) -> None:
         window = MainWindow(demo=False)
         self.assertEqual(
