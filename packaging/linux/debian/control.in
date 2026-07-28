@@ -1,0 +1,11 @@
+Package: reelabel
+Version: @VERSION@
+Section: utils
+Priority: optional
+Architecture: amd64
+Maintainer: ares-projects-H
+Depends: libc6 (>= 2.38), libegl1
+Homepage: https://github.com/ares-projects-H/reelabel
+Description: Safe offline media file renamer
+ Reelabel previews and validates movie, series, subtitle, and containing-folder
+ renames before applying only the changes approved by the user.
