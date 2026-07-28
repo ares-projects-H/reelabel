@@ -71,6 +71,15 @@ explains how to do this on each system.
 For explanations of every option, preview status, batch-edit question, and
 safety warning, read the [first-time user guide](docs/user-guide.md).
 
+## Settings
+
+On macOS, use **Reelabel → Settings…** in the system menu bar. On Windows and
+Linux, use **File → Settings…** in the application window.
+
+Reelabel can remember the System/Light/Dark appearance and conservative scan
+defaults. Settings remain local and cannot enable related image/NFO handling
+by default, analytics, background networking, or automatic updates.
+
 ## Run from source for development
 
 You do not need this section to use an installer. It is intended for people who

@@ -39,6 +39,7 @@ jobs:
         shell: pwsh
         run: |
           $env:REELABEL_SMOKE_TEST = "1"
+          $env:REELABEL_SMOKE_TEST_SETTINGS = "1"
           $env:QT_QPA_PLATFORM = "offscreen"
           & ".\dist\Reelabel\Reelabel.exe"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -87,7 +88,8 @@ jobs:
 
       - name: Smoke-test packaged application
         run: |
-          REELABEL_SMOKE_TEST=1 QT_QPA_PLATFORM=offscreen \
+          REELABEL_SMOKE_TEST=1 REELABEL_SMOKE_TEST_SETTINGS=1 \
+            QT_QPA_PLATFORM=offscreen \
             "dist/Reelabel.app/Contents/MacOS/Reelabel"
 
       - name: Build DMG
@@ -126,7 +128,8 @@ jobs:
 
       - name: Smoke-test packaged directory
         run: |
-          REELABEL_SMOKE_TEST=1 QT_QPA_PLATFORM=offscreen \
+          REELABEL_SMOKE_TEST=1 REELABEL_SMOKE_TEST_SETTINGS=1 \
+            QT_QPA_PLATFORM=offscreen \
             "dist/Reelabel/Reelabel"
 
       - name: Download AppImage tooling
@@ -146,7 +149,8 @@ jobs:
 
       - name: Smoke-test AppImage
         run: |
-          REELABEL_SMOKE_TEST=1 QT_QPA_PLATFORM=offscreen \
+          REELABEL_SMOKE_TEST=1 REELABEL_SMOKE_TEST_SETTINGS=1 \
+            QT_QPA_PLATFORM=offscreen \
             release/Reelabel-0.1.0-Linux-x86_64.AppImage \
             --appimage-extract-and-run
 
@@ -154,7 +158,8 @@ jobs:
         run: |
           sudo apt-get install --yes \
             ./release/Reelabel-0.1.0-Ubuntu-24.04-x86_64.deb
-          REELABEL_SMOKE_TEST=1 QT_QPA_PLATFORM=offscreen /usr/bin/reelabel
+          REELABEL_SMOKE_TEST=1 REELABEL_SMOKE_TEST_SETTINGS=1 \
+            QT_QPA_PLATFORM=offscreen /usr/bin/reelabel
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:

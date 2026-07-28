@@ -16,6 +16,7 @@ def main() -> int:
     """Run the Qt event loop."""
     application = QApplication.instance() or QApplication(sys.argv)
     application.setApplicationName("Reelabel")
+    application.setApplicationDisplayName("Reelabel")
     application.setOrganizationName("ares-projects-H")
     # No font family is forced: Qt uses the platform's native application font
     # (San Francisco, Segoe UI, or the configured Linux desktop font).
@@ -31,6 +32,10 @@ def main() -> int:
     # Package workflows use this local-only switch to verify that the bundled
     # GUI starts without Python being installed on the target system.
     if os.environ.get("REELABEL_SMOKE_TEST") == "1":
+        # Installer builds additionally open Settings so missing Qt modules or
+        # platform-specific menu wiring fail before an artifact is published.
+        if os.environ.get("REELABEL_SMOKE_TEST_SETTINGS") == "1":
+            QTimer.singleShot(0, window.settings_action.trigger)
         QTimer.singleShot(1000, application.quit)
     return application.exec()
 
