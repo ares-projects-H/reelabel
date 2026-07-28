@@ -4,6 +4,11 @@
 
 <h1 align="center">Reelabel</h1>
 
+<p align="center">
+  <a href="https://github.com/ares-projects-H/reelabel/actions/workflows/ci.yml"><img alt="Tests" src="https://github.com/ares-projects-H/reelabel/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="LICENSE"><img alt="License: GPL-3.0-or-later" src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue.svg"></a>
+</p>
+
 Reelabel is a safe, offline desktop utility for cleaning the names of
 movie, series, and subtitle files, as well as their containing release folders.
 It always previews proposed changes first, preserves media contents, and
@@ -51,7 +56,7 @@ show a warning. Before opening the download, compare it with
 `SHA256SUMS.txt`. The [step-by-step installation guide](docs/installation.md)
 explains how to do this on each system.
 
-## First use
+## First use in eight steps
 
 1. Open Reelabel.
 2. Drag a media folder into the window, or click **Browse**.
@@ -62,6 +67,9 @@ explains how to do this on each system.
    column, type the new name, and press Enter.
 7. Click **Apply selected changes** only when the preview is correct.
 8. To restore the previous names, open **History / Undo**.
+
+For explanations of every option, preview status, batch-edit question, and
+safety warning, read the [first-time user guide](docs/user-guide.md).
 
 ## Run from source for development
 
@@ -106,8 +114,19 @@ Related images and NFO files are never proposed unless
 ## Contributing and security
 
 Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) before
-opening a pull request. Please report security problems privately using the
-instructions in [SECURITY.md](SECURITY.md).
+opening a pull request. A contribution cannot change the official application
+until the owner has reviewed and merged it.
+
+Please report security problems privately using the instructions in
+[SECURITY.md](SECURITY.md). Maintainers can follow the
+[safe GitHub review and release guide](docs/maintainer-guide.md).
+
+## Support Reelabel
+
+Reelabel will remain free and open source. If it saves you time, you can
+optionally support its maintenance through
+[GitHub Sponsors](https://github.com/sponsors/ares-projects-H). Sponsorship
+does not unlock features or affect which contributions are accepted.
 
 ## License
 

@@ -36,6 +36,9 @@ The first installer is unsigned. Windows SmartScreen may display **Windows
 protected your PC**. Verify the SHA-256 value first, then use **More info** and
 **Run anyway** only if the file came from the official GitHub release.
 
+To uninstall it, open **Settings → Apps → Installed apps**, find **Reelabel**,
+open its menu, and choose **Uninstall**.
+
 ## macOS Apple Silicon or Intel
 
 1. Download the DMG matching your Mac:
@@ -47,6 +50,9 @@ protected your PC**. Verify the SHA-256 value first, then use **More info** and
 The first application is unsigned. If macOS blocks the first launch, verify the
 SHA-256 value, Control-click the app in Finder, choose **Open**, then confirm
 **Open**. You only need this approval once.
+
+To uninstall it, quit Reelabel and move **Reelabel** from **Applications** to
+the Trash.
 
 ## Ubuntu 24.04 LTS x86_64
 
@@ -62,6 +68,16 @@ You can also install it from a terminal:
 ```bash
 sudo apt install ./Reelabel-0.1.0-Ubuntu-24.04-x86_64.deb
 ```
+
+To uninstall the Ubuntu package:
+
+```bash
+sudo apt remove reelabel
+```
+
+Use `sudo apt purge reelabel` instead if you also want Ubuntu to remove
+package-managed configuration. Personal History / Undo data is kept separately
+to avoid silently removing recovery information.
 
 ## Portable AppImage for Linux x86_64
 
@@ -89,6 +105,9 @@ If FUSE cannot be installed, use the AppImage runtime's fallback:
 ```bash
 ./Reelabel-0.1.0-Linux-x86_64.AppImage --appimage-extract-and-run
 ```
+
+An AppImage is not installed system-wide. To remove it, close Reelabel and
+delete the downloaded `.AppImage` file.
 
 ## First safe test
 
