@@ -22,11 +22,14 @@ Reelabel includes:
 - movie, series, recursion, and extras options;
 - a cancellable background scan;
 - an editable before/after preview with working Ready, Review, and Ignored filters;
+- preview columns that can be resized by dragging and sorted by clicking their
+  headers;
 - proposed names that can be edited by double-clicking a cell in the
   **Proposed name** column;
 - editable folder-name proposals for movies, series, and other media collections;
 - optional same-folder propagation after correcting a title or season pattern
   in one episode proposal;
+- optional propagation of a corrected movie title to its related subtitle files;
 - cross-platform filename, extension, path, and collision validation;
 - partial selection and all-or-nothing rename application;
 - app-data history with safe Undo;
@@ -40,7 +43,8 @@ When version 0.1.0 is published, download the package for your platform from the
 
 - Windows 10/11 x64: installer EXE;
 - macOS Apple Silicon or Intel: the matching DMG;
-- Linux x86_64: AppImage.
+- Ubuntu 24.04 x86_64: DEB package (recommended);
+- other Linux x86_64 distributions: portable AppImage.
 
 The first release is unsigned, so Windows SmartScreen or macOS Gatekeeper may
 show a warning. Before opening the download, compare it with

@@ -10,7 +10,7 @@ PYSIDE_AVAILABLE = importlib.util.find_spec("PySide6") is not None
 if PYSIDE_AVAILABLE:
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     from PySide6.QtCore import Qt
-    from PySide6.QtWidgets import QApplication
+    from PySide6.QtWidgets import QApplication, QHeaderView, QMessageBox
 
     from reelabel import api
     from reelabel.gui.main_window import DEMO_ROWS, MainWindow
@@ -37,23 +37,28 @@ class GuiPrototypeTests(unittest.TestCase):
         self.assertTrue(item.flags() & Qt.ItemFlag.ItemIsEditable)
         window.close()
 
+    def test_every_preview_column_can_be_resized(self) -> None:
+        window = MainWindow(demo=True)
+        header = window.table.horizontalHeader()
+        for column in range(window.table.columnCount()):
+            self.assertEqual(
+                header.sectionResizeMode(column),
+                QHeaderView.ResizeMode.Interactive,
+            )
+        window.close()
+
     def test_filter_buttons_show_the_selected_category(self) -> None:
         window = MainWindow(demo=True)
         window.filter_buttons["review"].click()
         visible = [
-            row
-            for row in range(window.table.rowCount())
-            if not window.table.isRowHidden(row)
+            row for row in range(window.table.rowCount()) if not window.table.isRowHidden(row)
         ]
         self.assertEqual(len(visible), 1)
         self.assertEqual(window.table.item(visible[0], 1).text(), "Review")
 
         window.filter_buttons["all"].click()
         self.assertFalse(
-            any(
-                window.table.isRowHidden(row)
-                for row in range(window.table.rowCount())
-            )
+            any(window.table.isRowHidden(row) for row in range(window.table.rowCount()))
         )
         window.close()
 
@@ -80,15 +85,32 @@ class GuiPrototypeTests(unittest.TestCase):
         )
         window.close()
 
+    def test_movie_edit_preserves_subtitle_suffixes(self) -> None:
+        window = MainWindow(demo=False)
+        self.assertEqual(
+            window._batch_movie_sidecar_name(
+                "Paper Moons (2018).mkv",
+                "Paper Moon (2018).mkv",
+                "Paper Moons (2018).fr.forced.srt",
+            ),
+            "Paper Moon (2018).fr.forced.srt",
+        )
+        self.assertIsNone(
+            window._batch_movie_sidecar_name(
+                "Paper Moons (2018).mkv",
+                "Paper Moon (2018).mkv",
+                "Another Movie (2018).srt",
+            )
+        )
+        window.close()
+
 
 if __name__ == "__main__":
     unittest.main()
 
 
 @unittest.skipUnless(PYSIDE_AVAILABLE, "PySide6 is not installed")
-def test_real_scan_runs_in_worker_and_enables_safe_apply(
-    qtbot, tmp_path: Path
-) -> None:
+def test_real_scan_runs_in_worker_and_enables_safe_apply(qtbot, tmp_path: Path) -> None:
     (tmp_path / "Campaign.2007.DVDRip.XviD.AC3.mkv").touch()
     window = MainWindow(demo=False)
     qtbot.addWidget(window)
@@ -97,8 +119,7 @@ def test_real_scan_runs_in_worker_and_enables_safe_apply(
     window.scan_button.click()
 
     qtbot.waitUntil(
-        lambda: window.current_report is not None
-        and window._scan_thread is None,
+        lambda: window.current_report is not None and window._scan_thread is None,
         timeout=3000,
     )
     assert window.table.rowCount() >= 1
@@ -134,3 +155,67 @@ def test_editing_one_episode_can_update_its_folder_group(
     ]
     assert "Gotham S04 E01.mkv" in proposals
     assert "Gotham S04 E02.mkv" in proposals
+
+
+@unittest.skipUnless(PYSIDE_AVAILABLE, "PySide6 is not installed")
+def test_preview_without_a_folder_shows_a_clear_error(qtbot, monkeypatch) -> None:
+    window = MainWindow(demo=False)
+    qtbot.addWidget(window)
+    warnings: list[tuple[str, str]] = []
+
+    def record_warning(parent, title: str, message: str):
+        warnings.append((title, message))
+        return QMessageBox.StandardButton.Ok
+
+    monkeypatch.setattr(QMessageBox, "warning", record_warning)
+    window.path_edit.clear()
+    window.scan_button.click()
+
+    assert warnings == [("Choose a folder", "Choose a media folder before previewing changes.")]
+    assert window.current_report is None
+
+
+@unittest.skipUnless(PYSIDE_AVAILABLE, "PySide6 is not installed")
+def test_clicking_a_preview_header_toggles_sort_order(qtbot) -> None:
+    window = MainWindow(demo=True)
+    qtbot.addWidget(window)
+    header = window.table.horizontalHeader()
+
+    header.sectionClicked.emit(2)
+    ascending = [window.table.item(row, 2).text() for row in range(window.table.rowCount())]
+
+    header.sectionClicked.emit(2)
+    descending = [window.table.item(row, 2).text() for row in range(window.table.rowCount())]
+    assert descending == list(reversed(ascending))
+    assert header.sortIndicatorOrder() == Qt.SortOrder.DescendingOrder
+
+
+@unittest.skipUnless(PYSIDE_AVAILABLE, "PySide6 is not installed")
+def test_editing_a_movie_can_update_related_subtitles(qtbot, tmp_path: Path, monkeypatch) -> None:
+    for suffix in (".mkv", ".srt", ".fr.forced.ass"):
+        (tmp_path / f"Paper.Moons.2018.1080p-DEMO{suffix}").touch()
+    report = api.scan(api.ScanOptions(tmp_path))
+    window = MainWindow(demo=False)
+    qtbot.addWidget(window)
+    window.current_report = report
+    window._populate_report(report)
+    monkeypatch.setattr(window, "_confirm_action", lambda *args: True)
+
+    original_subtitles = {
+        window.table.item(row, 3).text()
+        for row in range(window.table.rowCount())
+        if window.table.item(row, 4).text() in {"SRT", "ASS"}
+    }
+    edited = next(
+        window.table.item(row, 3)
+        for row in range(window.table.rowCount())
+        if window.table.item(row, 4).text() == "MKV"
+    )
+    original_movie = edited.text()
+    edited.setText(edited.text().replace("Paper Moons", "Paper Moon"))
+
+    proposals = {window.table.item(row, 3).text() for row in range(window.table.rowCount())}
+    edited_movie = original_movie.replace("Paper Moons", "Paper Moon")
+    assert edited_movie in proposals
+    for subtitle in original_subtitles:
+        assert (Path(edited_movie).stem + subtitle[len(Path(original_movie).stem) :]) in proposals

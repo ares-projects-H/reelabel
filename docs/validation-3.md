@@ -7,7 +7,8 @@ publishes version 0.1.0 from GitHub Actions.
 
 - Windows 10/11 x64 installer EXE.
 - Separate macOS DMGs for Apple Silicon and Intel.
-- Linux x86_64 AppImage.
+- Ubuntu 24.04 x86_64 DEB package.
+- Portable Linux x86_64 AppImage.
 - SHA-256 checksums for every download.
 - Automated tests on Windows, macOS, and Linux.
 - Packaged-application startup tests on every build platform.
@@ -20,7 +21,7 @@ native main window. Packaged builds also embed:
 
 - `reelabel-icon.ico` in Windows executables and the installer;
 - `reelabel-icon.icns` in the macOS application bundle;
-- `reelabel-icon.png` in the Linux AppImage.
+- `reelabel-icon.png` in both Linux packages.
 
 ## Signing status
 

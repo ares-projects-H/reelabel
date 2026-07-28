@@ -100,7 +100,7 @@ jobs:
           if-no-files-found: error
 
   linux:
-    name: Linux x86_64 AppImage
+    name: Linux x86_64 AppImage and DEB
     runs-on: ubuntu-24.04
 
     steps:
@@ -141,16 +141,27 @@ jobs:
         run: |
           packaging/linux/build_appimage.sh "$VERSION" "$PWD/squashfs-root/AppRun"
 
+      - name: Build Ubuntu package
+        run: packaging/linux/build_deb.sh "$VERSION"
+
       - name: Smoke-test AppImage
         run: |
           REELABEL_SMOKE_TEST=1 QT_QPA_PLATFORM=offscreen \
             release/Reelabel-0.1.0-Linux-x86_64.AppImage \
             --appimage-extract-and-run
 
+      - name: Install and smoke-test Ubuntu package
+        run: |
+          sudo apt-get install --yes \
+            ./release/Reelabel-0.1.0-Ubuntu-24.04-x86_64.deb
+          REELABEL_SMOKE_TEST=1 QT_QPA_PLATFORM=offscreen reelabel
+
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: linux-x86_64
-          path: release/Reelabel-0.1.0-Linux-x86_64.AppImage
+          path: |
+            release/Reelabel-0.1.0-Linux-x86_64.AppImage
+            release/Reelabel-0.1.0-Ubuntu-24.04-x86_64.deb
           if-no-files-found: error
 
   release:

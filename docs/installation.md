@@ -48,22 +48,47 @@ The first application is unsigned. If macOS blocks the first launch, verify the
 SHA-256 value, Control-click the app in Finder, choose **Open**, then confirm
 **Open**. You only need this approval once.
 
-## Linux x86_64
+## Ubuntu 24.04 LTS x86_64
+
+The DEB package is the easiest option on Ubuntu:
+
+1. Download `Reelabel-0.1.0-Ubuntu-24.04-x86_64.deb`.
+2. Double-click the downloaded file.
+3. Choose **Install** in Ubuntu App Center.
+4. Open **Reelabel** from the application menu.
+
+You can also install it from a terminal:
+
+```bash
+sudo apt install ./Reelabel-0.1.0-Ubuntu-24.04-x86_64.deb
+```
+
+## Portable AppImage for Linux x86_64
 
 1. Download `Reelabel-0.1.0-Linux-x86_64.AppImage`.
-2. Make it executable:
+2. An AppImage is a portable application rather than a traditional installer.
+   Before the first launch, right-click it, open **Properties**, choose
+   **Permissions**, and enable **Allow executing file as program**.
+3. Double-click the AppImage to start Reelabel.
 
-   ```bash
-   chmod +x Reelabel-0.1.0-Linux-x86_64.AppImage
-   ```
+The equivalent terminal commands are:
 
-3. Run it:
+```bash
+chmod +x Reelabel-0.1.0-Linux-x86_64.AppImage
+./Reelabel-0.1.0-Linux-x86_64.AppImage
+```
 
-   ```bash
-   ./Reelabel-0.1.0-Linux-x86_64.AppImage
-   ```
+If Ubuntu 24.04 reports a FUSE error, install its FUSE 2 compatibility library:
 
-Some distributions require FUSE 2 compatibility to run AppImages.
+```bash
+sudo apt install libfuse2t64
+```
+
+If FUSE cannot be installed, use the AppImage runtime's fallback:
+
+```bash
+./Reelabel-0.1.0-Linux-x86_64.AppImage --appimage-extract-and-run
+```
 
 ## First safe test
 
@@ -77,7 +102,9 @@ untouched.
 4. Review every proposed change. Uncheck a row to exclude it.
 5. To correct a name, double-click its cell in the **Proposed name** column,
    type the correction, and press Enter.
-6. Click **Apply selected changes** only after checking the complete preview.
-7. Open **History / Undo** and restore the operation to confirm that undo works.
+6. Drag a column divider to change its width, or click a text-column heading to
+   switch between ascending and descending order.
+7. Click **Apply selected changes** only after checking the complete preview.
+8. Open **History / Undo** and restore the operation to confirm that undo works.
 
 Related images and NFO files stay unchecked unless you select them explicitly.

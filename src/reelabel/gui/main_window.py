@@ -184,9 +184,7 @@ class DropZone(QFrame):
 
     def dragEnterEvent(self, event: QDragEnterEvent) -> None:  # noqa: N802
         urls = event.mimeData().urls()
-        if len(urls) == 1 and urls[0].isLocalFile() and Path(
-            urls[0].toLocalFile()
-        ).is_dir():
+        if len(urls) == 1 and urls[0].isLocalFile() and Path(urls[0].toLocalFile()).is_dir():
             event.acceptProposedAction()
 
     def dropEvent(self, event: QDropEvent) -> None:  # noqa: N802
@@ -243,6 +241,8 @@ class MainWindow(QMainWindow):
         self._scan_worker: ScanWorker | None = None
         self._loading_table = False
         self._active_filter = "all"
+        self._sort_column: int | None = None
+        self._sort_order = Qt.SortOrder.AscendingOrder
         self.filter_buttons: dict[str, QPushButton] = {}
         self._build_ui()
         if demo:
@@ -320,9 +320,7 @@ class MainWindow(QMainWindow):
             button = QPushButton(f"{label} 0")
             button.setObjectName("filter")
             button.setProperty("active", key == "all")
-            button.clicked.connect(
-                lambda checked=False, selected=key: self._set_filter(selected)
-            )
+            button.clicked.connect(lambda checked=False, selected=key: self._set_filter(selected))
             self.filter_buttons[key] = button
             filter_row.addWidget(button)
         edit_hint = QLabel("Tip: Double-click a Proposed name to edit it.")
@@ -344,21 +342,27 @@ class MainWindow(QMainWindow):
         )
         self.table.setAlternatingRowColors(True)
         self.table.setShowGrid(False)
-        self.table.setSelectionBehavior(
-            QAbstractItemView.SelectionBehavior.SelectRows
-        )
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setToolTip(
-            "Double-click a Proposed name to edit it. Episode edits can "
-            "optionally update the same pattern for other files in the folder."
+            "Double-click a Proposed name to edit it. Related episode or movie "
+            "files can be updated together after you confirm."
         )
         self.table.verticalHeader().setVisible(False)
         self.table.itemChanged.connect(self._table_item_changed)
         header = self.table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        # Interactive mode lets users drag every header divider to make any
+        # preview column wider or narrower on every supported desktop.
+        for column in range(self.table.columnCount()):
+            header.setSectionResizeMode(column, QHeaderView.ResizeMode.Interactive)
+        header.setMinimumSectionSize(64)
+        header.resizeSection(0, 76)
+        header.resizeSection(1, 96)
+        header.resizeSection(2, 390)
+        header.resizeSection(3, 390)
+        header.resizeSection(4, 84)
+        header.setStretchLastSection(True)
+        header.setSectionsClickable(True)
+        header.sectionClicked.connect(self._sort_table_by_column)
         page.addWidget(self.table, 1)
 
         footer = QHBoxLayout()
@@ -419,7 +423,17 @@ class MainWindow(QMainWindow):
         self._start_scan()
 
     def _start_scan(self) -> None:
-        folder = Path(self.path_edit.text().strip()).expanduser()
+        folder_text = self.path_edit.text().strip()
+        # Path("") represents the current working directory, so the empty
+        # value must be rejected before it is converted to a Path.
+        if not folder_text:
+            QMessageBox.warning(
+                self,
+                "Choose a folder",
+                "Choose a media folder before previewing changes.",
+            )
+            return
+        folder = Path(folder_text).expanduser()
         if not folder.is_dir():
             QMessageBox.warning(
                 self,
@@ -558,6 +572,7 @@ class MainWindow(QMainWindow):
                 detail="Optional related image/NFO. Always unchecked by default.",
             )
         self._loading_table = False
+        self._apply_current_sort()
         self._refresh_counts()
         self._set_filter(self._active_filter)
         self._revalidate_table()
@@ -598,9 +613,7 @@ class MainWindow(QMainWindow):
                 else Qt.ItemFlag.NoItemFlags
             )
         )
-        include.setCheckState(
-            Qt.CheckState.Checked if selected else Qt.CheckState.Unchecked
-        )
+        include.setCheckState(Qt.CheckState.Checked if selected else Qt.CheckState.Unchecked)
         status_item = QTableWidgetItem(status)
         status_item.setData(CATEGORY_ROLE, category)
         status_item.setData(KIND_ROLE, kind)
@@ -612,16 +625,12 @@ class MainWindow(QMainWindow):
             else Qt.GlobalColor.gray
         )
         original_item = QTableWidgetItem(original)
-        original_item.setFlags(
-            original_item.flags() & ~Qt.ItemFlag.ItemIsEditable
-        )
+        original_item.setFlags(original_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
         original_item.setData(SOURCE_ROLE, str(source) if source else "")
         proposed_item = QTableWidgetItem(proposed)
         proposed_item.setData(EDIT_BASE_ROLE, proposed)
         if kind != "rename":
-            proposed_item.setFlags(
-                proposed_item.flags() & ~Qt.ItemFlag.ItemIsEditable
-            )
+            proposed_item.setFlags(proposed_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
         type_item = QTableWidgetItem(media_type)
         type_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
         for column, item in enumerate(
@@ -651,15 +660,14 @@ class MainWindow(QMainWindow):
                 source=None,
             )
         self._loading_table = False
+        self._apply_current_sort()
         self._refresh_counts()
         self._set_filter("all")
         self.notice.setText("✓ Demo preview — no files can be changed")
         self.apply_button.setEnabled(False)
 
     def _show_empty_state(self) -> None:
-        self._set_summary(
-            (("0", "ITEMS FOUND"), ("0", "READY"), ("0", "REVIEW"), ("0", "IGNORED"))
-        )
+        self._set_summary((("0", "ITEMS FOUND"), ("0", "READY"), ("0", "REVIEW"), ("0", "IGNORED")))
         self._refresh_filter_labels({"all": 0, "ready": 0, "review": 0, "ignored": 0})
 
     def _set_filter(self, category: str) -> None:
@@ -676,6 +684,35 @@ class MainWindow(QMainWindow):
                 row,
                 category != "all" and row_category != category,
             )
+
+    def _sort_table_by_column(self, column: int) -> None:
+        """Sort a preview column, reversing the order on the next click."""
+
+        # Include contains checkboxes rather than names. The other headers
+        # contain text that users reasonably expect to sort.
+        if column == 0:
+            return
+        if self._sort_column == column:
+            self._sort_order = (
+                Qt.SortOrder.DescendingOrder
+                if self._sort_order == Qt.SortOrder.AscendingOrder
+                else Qt.SortOrder.AscendingOrder
+            )
+        else:
+            self._sort_column = column
+            self._sort_order = Qt.SortOrder.AscendingOrder
+        self._apply_current_sort()
+
+    def _apply_current_sort(self) -> None:
+        """Apply the selected sort without changing checked or hidden rows."""
+
+        if self._sort_column is None:
+            return
+        self.table.sortItems(self._sort_column, self._sort_order)
+        header = self.table.horizontalHeader()
+        header.setSortIndicator(self._sort_column, self._sort_order)
+        header.setSortIndicatorShown(True)
+        self._set_filter(self._active_filter)
 
     def _refresh_counts(self) -> None:
         counts = {"all": self.table.rowCount(), "ready": 0, "review": 0, "ignored": 0}
@@ -710,9 +747,7 @@ class MainWindow(QMainWindow):
         for value, label in values:
             card = QFrame()
             card.setObjectName("summaryCard")
-            card.setSizePolicy(
-                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
-            )
+            card.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
             card_layout = QVBoxLayout(card)
             card_layout.setContentsMargins(14, 10, 14, 10)
             metric = QLabel(value)
@@ -755,24 +790,41 @@ class MainWindow(QMainWindow):
         edited_season = edited_match.group("season")
         if (
             original_prefix.casefold() == edited_prefix.casefold()
-            and (original_season or "").casefold()
-            == (edited_season or "").casefold()
+            and (original_season or "").casefold() == (edited_season or "").casefold()
         ):
             return None
         if candidate_prefix.casefold() != original_prefix.casefold():
             return None
 
         episode = candidate_match.group("episode").upper()
-        token = (
-            f"{edited_season.upper()} {episode}"
-            if edited_season
-            else episode
-        )
-        return (
-            edited_prefix
-            + token
-            + candidate[candidate_match.end() :]
-        )
+        token = f"{edited_season.upper()} {episode}" if edited_season else episode
+        return edited_prefix + token + candidate[candidate_match.end() :]
+
+    def _batch_movie_sidecar_name(
+        self,
+        original_movie: str,
+        edited_movie: str,
+        candidate: str,
+    ) -> str | None:
+        """Apply a movie title edit to one related subtitle proposal.
+
+        Only an exact proposed movie stem is replaced. Language and forced
+        subtitle suffixes such as ``.fr`` or ``.forced`` remain unchanged.
+        """
+
+        original_path = Path(original_movie)
+        edited_path = Path(edited_movie)
+        candidate_path = Path(candidate)
+        if original_path.suffix.casefold() not in core.VIDEO_EXTENSIONS:
+            return None
+        if candidate_path.suffix.casefold() not in core.SUBTITLE_EXTENSIONS:
+            return None
+
+        original_stem = original_path.stem
+        prefix = f"{original_stem}."
+        if not candidate.casefold().startswith(prefix.casefold()):
+            return None
+        return edited_path.stem + candidate[len(original_stem) :]
 
     def _offer_batch_edit(
         self,
@@ -791,7 +843,8 @@ class MainWindow(QMainWindow):
         if not source.is_file():
             return
 
-        changes: list[tuple[int, str]] = []
+        episode_changes: list[tuple[int, str]] = []
+        movie_changes: list[tuple[int, str]] = []
         for row in range(self.table.rowCount()):
             if row == edited_row:
                 continue
@@ -811,15 +864,36 @@ class MainWindow(QMainWindow):
                 proposed,
             )
             if updated and updated != proposed:
-                changes.append((row, updated))
+                episode_changes.append((row, updated))
+                continue
+            updated = self._batch_movie_sidecar_name(
+                previous_name,
+                edited_name,
+                proposed,
+            )
+            if updated and updated != proposed:
+                movie_changes.append((row, updated))
+
+        changes = episode_changes or movie_changes
         if not changes:
             return
 
+        if episode_changes:
+            prompt = f"Apply the same title and season pattern to {len(changes)} other item(s)?"
+            details = (
+                "Episode numbers and subtitle suffixes will be preserved. "
+                "You can still review, edit, or uncheck every result before applying."
+            )
+        else:
+            prompt = f"Apply this movie title to {len(changes)} related subtitle file(s)?"
+            details = (
+                "Subtitle language markers and file extensions will be preserved. "
+                "You can still review, edit, or uncheck every result before applying."
+            )
         if not self._confirm_action(
             "Update this folder's proposals?",
-            f"Apply the same title and season pattern to {len(changes)} other item(s)?",
-            "Episode numbers and subtitle suffixes will be preserved. "
-            "You can still review, edit, or uncheck every result before applying.",
+            prompt,
+            details,
             "Update proposals",
         ):
             return
@@ -830,6 +904,7 @@ class MainWindow(QMainWindow):
             proposed_item.setText(updated)
             proposed_item.setData(EDIT_BASE_ROLE, updated)
         self._loading_table = False
+        self._apply_current_sort()
 
     def _confirm_action(
         self,
@@ -906,9 +981,7 @@ class MainWindow(QMainWindow):
             status.setText("Review" if messages else "Ready")
             status.setData(CATEGORY_ROLE, "review" if messages else "ready")
             status.setToolTip("\n".join(messages))
-            status.setForeground(
-                Qt.GlobalColor.yellow if messages else Qt.GlobalColor.green
-            )
+            status.setForeground(Qt.GlobalColor.yellow if messages else Qt.GlobalColor.green)
         self._loading_table = False
         self._refresh_counts()
         self._set_filter(self._active_filter)
@@ -921,9 +994,7 @@ class MainWindow(QMainWindow):
         return issues
 
     def _history_dir(self) -> Path:
-        location = QStandardPaths.writableLocation(
-            QStandardPaths.StandardLocation.AppDataLocation
-        )
+        location = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppDataLocation)
         return Path(location) / "history"
 
     def _apply_selected(self) -> None:
@@ -943,13 +1014,9 @@ class MainWindow(QMainWindow):
         file_count = len(edits) - folder_count
         parts = []
         if file_count:
-            parts.append(
-                f"{file_count} {'file' if file_count == 1 else 'files'}"
-            )
+            parts.append(f"{file_count} {'file' if file_count == 1 else 'files'}")
         if folder_count:
-            parts.append(
-                f"{folder_count} {'folder' if folder_count == 1 else 'folders'}"
-            )
+            parts.append(f"{folder_count} {'folder' if folder_count == 1 else 'folders'}")
         if not self._confirm_action(
             "Apply selected changes?",
             f"Rename {' and '.join(parts)}?",
@@ -993,9 +1060,7 @@ class MainWindow(QMainWindow):
             self._revalidate_table()
             return
 
-        self.notice.setText(
-            f"✓ Renamed {result.renamed} item(s); an Undo entry was saved"
-        )
+        self.notice.setText(f"✓ Renamed {result.renamed} item(s); an Undo entry was saved")
         QMessageBox.information(
             self,
             "Changes applied",
@@ -1020,17 +1085,12 @@ class MainWindow(QMainWindow):
         entries = QListWidget()
         layout.addWidget(entries, 1)
 
-        for path in sorted(
-            self._history_dir().glob("rename_undo_*.json"), reverse=True
-        ):
+        for path in sorted(self._history_dir().glob("rename_undo_*.json"), reverse=True):
             try:
                 payload = json.loads(path.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError):
                 continue
-            count = sum(
-                item.get("status") == "renamed"
-                for item in payload.get("operations", [])
-            )
+            count = sum(item.get("status") == "renamed" for item in payload.get("operations", []))
             state = "Undone" if payload.get("undone_at") else "Available"
             item = QListWidgetItem(
                 f"{payload.get('created_at', path.stem)} — {count} rename(s) — {state}"
@@ -1064,9 +1124,7 @@ class MainWindow(QMainWindow):
                 return
             history_path = Path(item.data(Qt.ItemDataRole.UserRole))
             try:
-                history_payload = json.loads(
-                    history_path.read_text(encoding="utf-8")
-                )
+                history_payload = json.loads(history_path.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError):
                 history_payload = {}
             result = api.undo(
@@ -1076,9 +1134,7 @@ class MainWindow(QMainWindow):
             if result.errors:
                 QMessageBox.critical(dialog, "Undo could not run", "\n".join(result.errors))
                 return
-            QMessageBox.information(
-                dialog, "Undo complete", f"{result.restored} item(s) restored."
-            )
+            QMessageBox.information(dialog, "Undo complete", f"{result.restored} item(s) restored.")
             current_folder = Path(self.path_edit.text()).expanduser()
             for operation in history_payload.get("operations", []):
                 if operation.get("kind") != "directory":
@@ -1088,9 +1144,7 @@ class MainWindow(QMainWindow):
                     relative = current_folder.relative_to(new_folder)
                 except ValueError:
                     continue
-                self.path_edit.setText(
-                    str(Path(operation["old_path"]) / relative)
-                )
+                self.path_edit.setText(str(Path(operation["old_path"]) / relative))
                 break
             dialog.accept()
             if self.path_edit.text():
