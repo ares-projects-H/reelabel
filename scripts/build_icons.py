@@ -7,9 +7,9 @@ from pathlib import Path
 from PIL import Image
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-SOURCE = PROJECT_ROOT / "assets" / "media-renamer-icon.png"
-WINDOWS_ICON = PROJECT_ROOT / "assets" / "media-renamer-icon.ico"
-MACOS_ICON = PROJECT_ROOT / "assets" / "media-renamer-icon.icns"
+SOURCE = PROJECT_ROOT / "assets" / "reelabel-icon.png"
+WINDOWS_ICON = PROJECT_ROOT / "assets" / "reelabel-icon.ico"
+MACOS_ICON = PROJECT_ROOT / "assets" / "reelabel-icon.icns"
 
 
 def _square_source() -> Image.Image:

@@ -4,7 +4,7 @@ This checkpoint deliberately separates visual review from file-changing
 behavior. The PySide6 interface has been implemented, while its Apply action
 remains disabled until the working application is approved.
 
-![Media Renamer interface preview](screenshots/interface-preview.png)
+![Reelabel interface preview](screenshots/interface-preview.png)
 
 ## Decisions represented
 

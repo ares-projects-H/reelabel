@@ -9,4 +9,4 @@ build/
 dist/
 release/
 *.spec
-!packaging/media-renamer.spec
+!packaging/reelabel.spec

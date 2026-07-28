@@ -1,6 +1,6 @@
-# Contributing to Media Renamer
+# Contributing to Reelabel
 
-Thank you for helping improve Media Renamer. The project favors conservative,
+Thank you for helping improve Reelabel. The project favors conservative,
 explainable filename changes over aggressive guessing.
 
 You do not need direct access to the repository to contribute. GitHub reviews
@@ -39,7 +39,7 @@ The usual workflow is:
 
 ## Development setup
 
-Media Renamer requires Python 3.10 or newer for source development:
+Reelabel requires Python 3.10 or newer for source development:
 
 ```bash
 python -m venv .venv

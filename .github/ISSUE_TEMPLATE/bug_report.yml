@@ -23,7 +23,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: Media Renamer version
+      label: Reelabel version
       placeholder: "0.1.0"
     validations:
       required: true

@@ -13,8 +13,8 @@ from PySide6.QtCore import QTimer  # noqa: E402
 from PySide6.QtGui import QFont, QFontDatabase  # noqa: E402
 from PySide6.QtWidgets import QApplication, QMessageBox  # noqa: E402
 
-from media_renamer.gui.main_window import MainWindow  # noqa: E402
-from media_renamer.gui.styles import stylesheet  # noqa: E402
+from reelabel.gui.main_window import MainWindow  # noqa: E402
+from reelabel.gui.styles import stylesheet  # noqa: E402
 
 
 def main() -> int:
@@ -64,7 +64,7 @@ def main() -> int:
         lambda: window._confirm_action(
             "Apply selected changes?",
             "Rename 22 files and 1 folder?",
-            "Media Renamer will check every destination again before making "
+            "Reelabel will check every destination again before making "
             "changes. If any rename fails, completed changes are automatically "
             "restored. A History / Undo entry will be saved.",
             "Rename selected items",

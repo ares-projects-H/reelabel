@@ -6,7 +6,7 @@ from pathlib import Path
 
 import tomllib
 
-import media_renamer
+import reelabel
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -16,18 +16,21 @@ def test_public_version_is_consistent() -> None:
         (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
     )
     assert project["project"]["version"] == "0.1.0"
-    assert media_renamer.__version__ == "0.1.0"
+    assert project["project"]["name"] == "reelabel"
+    assert "reelabel" in project["project"]["scripts"]
+    assert "reelabel-gui" in project["project"]["scripts"]
+    assert reelabel.__version__ == "0.1.0"
     assert '#define MyAppVersion "0.1.0"' in (
-        PROJECT_ROOT / "packaging" / "windows" / "MediaRenamer.iss"
+        PROJECT_ROOT / "packaging" / "windows" / "Reelabel.iss"
     ).read_text(encoding="utf-8")
 
 
 def test_native_icons_have_expected_headers() -> None:
     windows_icon = (
-        PROJECT_ROOT / "assets" / "media-renamer-icon.ico"
+        PROJECT_ROOT / "assets" / "reelabel-icon.ico"
     ).read_bytes()
     macos_icon = (
-        PROJECT_ROOT / "assets" / "media-renamer-icon.icns"
+        PROJECT_ROOT / "assets" / "reelabel-icon.icns"
     ).read_bytes()
     assert windows_icon[:4] == b"\x00\x00\x01\x00"
     assert macos_icon[:4] == b"icns"
@@ -42,5 +45,8 @@ def test_release_workflow_covers_every_public_package() -> None:
         "macOS ${{ matrix.architecture }} DMG",
         "Linux x86_64 AppImage",
         "SHA-256 checksums",
+        "Reelabel-0.1.0-Windows-x64-Setup.exe",
+        "Reelabel-0.1.0-macOS-${{ matrix.architecture }}.dmg",
+        "Reelabel-0.1.0-Linux-x86_64.AppImage",
     ):
         assert expected in workflow

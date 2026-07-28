@@ -5,13 +5,13 @@ import json
 import os
 import re
 import sys
+import threading
 import uuid
 from collections import defaultdict
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterable
-
 
 VIDEO_EXTENSIONS = {".mkv", ".mp4", ".avi", ".mov", ".m4v", ".wmv", ".webm", ".mpg", ".mpeg", ".ts", ".m2ts", ".rmvb"}
 SUBTITLE_EXTENSIONS = {".srt", ".ass", ".ssa", ".sub", ".vtt", ".idx", ".sup"}
@@ -42,6 +42,7 @@ LANGUAGE_ALIASES = {
     "ja": "ja", "jp": "ja", "jpn": "ja", "japanese": "ja", "japonais": "ja",
 }
 TYPE_ALIASES = {"forced": "forced", "sdh": "sdh", "cc": "cc", "commentary": "commentary", "hearing impaired": "sdh"}
+_CONFIG_LOCK = threading.RLock()
 YEAR_RE = re.compile(r"(?<!\d)((?:19|20)\d{2})(?!\d)")
 DISC_RE = re.compile(r"(?<!\w)CD[\s._-]*(\d{1,2})(?!\w)", re.I)
 EPISODE_NUMBER = r"\d{1,3}(?:[.-]\d{1,2})?"
@@ -68,6 +69,9 @@ SEASON_FOLDER_RE = re.compile(r"^(?:s(?:eason|aison)?\s*)?(\d{1,2})$|^s(\d{1,2})
 # "Doctor X Season 3", "Show Saison 02", or the short "Show S03" form.
 SEASON_TITLE_SUFFIX_RE = re.compile(
     r"^(?P<title>.+?)\s+(?:S(?:eason|aison)?\s*)(?P<season>\d{1,2})$", re.I
+)
+FOLDER_SEASON_RE = re.compile(
+    r"\bS(?:EASON|AISON)?\s*(?P<season>\d{1,2})(?!\w)", re.I
 )
 
 
@@ -132,6 +136,7 @@ class Rename:
     reason: str
     status: str = "proposed"
     detail: str = ""
+    kind: str = "file"
 
 
 @dataclass
@@ -151,6 +156,10 @@ class Report:
     ignored: list[tuple[Path, str]] = field(default_factory=list)
     conflicts: list[tuple[Path, str]] = field(default_factory=list)
     missing_subtitles: list[tuple[Path, str]] = field(default_factory=list)
+
+
+class ScanCancelled(RuntimeError):
+    """Raised when a caller asks a read-only folder scan to stop."""
 
 
 def _normal_space(value: str) -> str:
@@ -210,6 +219,33 @@ def _extract_year(value: str) -> tuple[str, str | None]:
     # Removing a year from "Title (2020)" must not leave "Title ( )".
     cleaned = re.sub(r"[\(\[\{]\s*[\)\]\}]", " ", cleaned)
     return _normal_space(cleaned), match.group(1)
+
+
+def normalize_folder_name(value: str) -> str:
+    """Build a clean movie, series, or collection folder title.
+
+    Folder proposals reuse the conservative release-token cleanup used for
+    media files. A recognizable season marker is retained at the end, while a
+    movie year uses the familiar ``Title (Year)`` form.
+    """
+
+    cleaned = _remove_technical(value)
+    season_match = FOLDER_SEASON_RE.search(cleaned)
+    season = int(season_match.group("season")) if season_match else None
+    if season_match:
+        cleaned = (
+            cleaned[: season_match.start()] + " " + cleaned[season_match.end() :]
+        )
+    without_year, year = _extract_year(cleaned)
+    title = _title_case(without_year)
+    if not title:
+        return value
+    result = title
+    if year:
+        result += f" ({year})"
+    if season is not None:
+        result += f" S{season:02d}"
+    return result
 
 
 def _extract_disc(value: str) -> tuple[str, int | None]:
@@ -424,11 +460,21 @@ def load_config(config_path: Path | None) -> dict[str, set[str]]:
     return config
 
 
-def discover(root: Path, recursive: bool, config: dict[str, set[str]]) -> tuple[list[Path], list[Path]]:
+def discover(
+    root: Path,
+    recursive: bool,
+    config: dict[str, set[str]],
+    cancelled: Callable[[], bool] | None = None,
+) -> tuple[list[Path], list[Path]]:
     iterator: Iterable[Path] = root.rglob("*") if recursive else root.iterdir()
     videos, subtitles = [], []
     for path in iterator:
-        if not path.is_file():
+        if cancelled is not None and cancelled():
+            raise ScanCancelled("The scan was cancelled.")
+        # File symlinks are deliberately excluded. Following one during
+        # validation or apply could turn an approved in-folder rename into a
+        # modification of an unrelated external target.
+        if path.is_symlink() or not path.is_file():
             continue
         suffix = path.suffix.casefold()
         if suffix in config["video_extensions"]:
@@ -470,13 +516,59 @@ def _match_subtitle(subtitle: MediaFile, videos: list[MediaFile]) -> MediaFile |
     return scored[0][1] if scored[0][0] > 0 and (len(scored) == 1 or scored[0][0] > scored[1][0]) else None
 
 
-def build_report(root: Path, recursive: bool = True, only: str | None = None, include_extras: bool = False, config_path: Path | None = None) -> Report:
+def build_report(
+    root: Path,
+    recursive: bool = True,
+    only: str | None = None,
+    include_extras: bool = False,
+    config_path: Path | None = None,
+    include_sidecars: bool = False,
+    cancelled: Callable[[], bool] | None = None,
+) -> Report:
+    """Build a read-only rename report without leaking custom config globally.
+
+    The original CLI extends module-level token sets while loading a custom
+    configuration. A desktop application can scan several folders during one
+    session, so every scan must restore those defaults when it finishes.
+    """
+    with _CONFIG_LOCK:
+        original_technical = set(TECHNICAL_TOKENS)
+        original_extras = set(EXTRA_TOKENS)
+        original_languages = dict(LANGUAGE_ALIASES)
+        try:
+            return _build_report(
+                root,
+                recursive,
+                only,
+                include_extras,
+                config_path,
+                include_sidecars,
+                cancelled,
+            )
+        finally:
+            TECHNICAL_TOKENS.clear()
+            TECHNICAL_TOKENS.update(original_technical)
+            EXTRA_TOKENS.clear()
+            EXTRA_TOKENS.update(original_extras)
+            LANGUAGE_ALIASES.clear()
+            LANGUAGE_ALIASES.update(original_languages)
+
+
+def _build_report(
+    root: Path,
+    recursive: bool,
+    only: str | None,
+    include_extras: bool,
+    config_path: Path | None,
+    include_sidecars: bool,
+    cancelled: Callable[[], bool] | None,
+) -> Report:
     root = root.resolve()
     config = load_config(config_path)
     # Configuration only extends the conservative built-ins for this process.
     TECHNICAL_TOKENS.update(config["technical_tokens"])
     EXTRA_TOKENS.update(config["extra_tokens"])
-    videos, subtitles = discover(root, recursive, config)
+    videos, subtitles = discover(root, recursive, config, cancelled)
     report = Report(len(videos), len(subtitles))
     video_items = [MediaFile(path, "video", parse_media_name(path, root)) for path in videos]
     subtitle_items = [MediaFile(path, "subtitle", parse_media_name(path, root), subtitle_suffixes(path)) for path in subtitles]
@@ -556,9 +648,43 @@ def build_report(root: Path, recursive: bool = True, only: str | None = None, in
             report.missing_subtitles.append((video.path, video.parsed.display()))
 
     _mark_conflicts(report)
-    # This preserved CLI predates the desktop app's explicit sidecar-selection
-    # workflow. Keep it rename-only: images and NFO files are never queued for
-    # deletion automatically.
+    changed_directories = {
+        rename.source.parent
+        for rename in report.renames
+        if rename.status == "proposed" and rename.source.is_file()
+    }
+    # Related artwork and NFO files are informational in the public app.
+    # They are listed only after an explicit opt-in, never by default.
+    if include_sidecars:
+        for directory in sorted(changed_directories):
+            for path in sorted(directory.iterdir()):
+                if path.is_file() and path.suffix.casefold() in SIDECAR_EXTENSIONS:
+                    report.deletions.append(Deletion(path))
+
+    # Propose only leaf media directories. Avoiding nested directory operations
+    # keeps file and folder changes understandable and safely reversible in one
+    # operation, including when the selected folder itself is a release folder.
+    leaf_directories = {
+        directory
+        for directory in changed_directories
+        if not any(
+            other != directory and other.is_relative_to(directory)
+            for other in changed_directories
+        )
+    }
+    for directory in sorted(leaf_directories):
+        proposed_name = normalize_folder_name(directory.name)
+        destination = directory.with_name(proposed_name)
+        if proposed_name and destination != directory:
+            report.renames.append(
+                Rename(
+                    directory,
+                    destination,
+                    "folder name normalized",
+                    kind="directory",
+                )
+            )
+    _mark_conflicts(report)
     return report
 
 
@@ -611,24 +737,96 @@ def _destination_is_free(destination: Path) -> bool:
     return not any(path.name.casefold() == destination.name.casefold() for path in destination.parent.iterdir())
 
 
-def execute(report: Report, root: Path) -> tuple[Path, Path]:
-    safe = [r for r in report.renames if r.status == "proposed"]
+def _path_after_directory_renames(
+    path: Path,
+    directory_renames: Iterable[Rename],
+) -> Path:
+    """Return where a child path lives after its containing directory moves."""
+
+    for rename in sorted(
+        directory_renames,
+        key=lambda item: len(item.source.parts),
+        reverse=True,
+    ):
+        try:
+            relative = path.relative_to(rename.source)
+        except ValueError:
+            continue
+        return rename.destination / relative
+    return path
+
+
+def execute(
+    report: Report,
+    root: Path,
+    history_dir: Path | None = None,
+) -> tuple[Path, Path]:
+    """Apply a prepared report and write its audit files outside media folders.
+
+    The CLI keeps its historical behavior by omitting ``history_dir``. The
+    desktop app passes its private data directory so library folders receive
+    only the explicitly approved media-name changes.
+    """
+    root = root.resolve()
+    safe = [rename for rename in report.renames if rename.status == "proposed"]
+    file_renames = [rename for rename in safe if rename.kind != "directory"]
+    directory_renames = [
+        rename for rename in safe if rename.kind == "directory"
+    ]
     deletions = list(report.deletions) if safe else []
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    log_path = root / f"rename_log_{stamp}.json"
-    undo_path = root / f"rename_undo_{stamp}.json"
+    # Microseconds keep separate rapid operations from overwriting one another's
+    # audit files, which is important when the GUI applies small batches.
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    output_dir = history_dir or root
+    output_dir.mkdir(parents=True, exist_ok=True)
+    log_path = output_dir / f"rename_log_{stamp}.json"
+    undo_path = output_dir / f"rename_undo_{stamp}.json"
     outcomes: list[dict[str, str]] = []
     deletion_outcomes: list[dict[str, str]] = []
-    temporary: list[tuple[Rename, Path]] = []
+    file_temporary: list[tuple[Rename, Path]] = []
+    directory_temporary: list[tuple[Rename, Path]] = []
     staged_deletions: list[tuple[Deletion, Path]] = []
-    finalized_sources: set[Path] = set()
+    finalized_files: set[Path] = set()
+    finalized_directories: set[Path] = set()
+    directory_commit_succeeded = False
     try:
         for rename in safe:
             if not rename.source.exists():
                 raise FileNotFoundError(f"source disparue depuis la planification: {rename.source}")
+            canonical_source = rename.source.resolve()
+            canonical_destination = rename.destination.resolve()
+            source_in_root = canonical_source.is_relative_to(root)
+            destination_in_root = canonical_destination.is_relative_to(root)
+            selected_root_folder_move = (
+                rename.kind == "directory"
+                and canonical_source == root
+                and canonical_destination.parent == root.parent
+            )
+            if (
+                rename.source.is_symlink()
+                or not source_in_root
+                or (not destination_in_root and not selected_root_folder_move)
+            ):
+                raise OSError(
+                    "une opération utilise un lien symbolique ou quitte le dossier sélectionné"
+                )
+            if rename.kind == "directory" and not rename.source.is_dir():
+                raise NotADirectoryError(
+                    f"le dossier planifié n'est plus un dossier: {rename.source}"
+                )
+        for first in directory_renames:
+            for second in directory_renames:
+                if first is not second and first.source.is_relative_to(second.source):
+                    raise OSError(
+                        "les renommages de dossiers imbriqués ne sont pas autorisés"
+                    )
+
+        # Files are completed while their parent folders still have their
+        # original paths. Folder moves happen only after every file succeeded.
+        for rename in file_renames:
             temp = rename.source.with_name(f".{rename.source.name}.rename-media-{uuid.uuid4().hex}.tmp")
             os.replace(rename.source, temp)
-            temporary.append((rename, temp))
+            file_temporary.append((rename, temp))
         for deletion in deletions:
             if not deletion.path.exists():
                 deletion.status = "missing"
@@ -637,41 +835,153 @@ def execute(report: Report, root: Path) -> tuple[Path, Path]:
             temp = deletion.path.with_name(f".{deletion.path.name}.rename-media-delete-{uuid.uuid4().hex}.tmp")
             os.replace(deletion.path, temp)
             staged_deletions.append((deletion, temp))
-        for rename, temp in temporary:
+        for rename, temp in file_temporary:
             if not _destination_is_free(rename.destination):
                 raise FileExistsError(f"destination apparue depuis la planification: {rename.destination}")
             os.replace(temp, rename.destination)
-            finalized_sources.add(rename.source)
-            rename.status = "renamed"
-            outcomes.append({"old_path": str(rename.source), "new_path": str(rename.destination), "status": "renamed", "error": ""})
+            finalized_files.add(rename.source)
+
+        for rename in directory_renames:
+            temp = rename.source.with_name(
+                f".{rename.source.name}.rename-media-folder-{uuid.uuid4().hex}.tmp"
+            )
+            os.replace(rename.source, temp)
+            directory_temporary.append((rename, temp))
+        for rename, temp in directory_temporary:
+            if not _destination_is_free(rename.destination):
+                raise FileExistsError(
+                    f"destination apparue depuis la planification: {rename.destination}"
+                )
+            os.replace(temp, rename.destination)
+            finalized_directories.add(rename.source)
     except OSError as exc:
-        media_to_restore = [
-            (rename.destination if rename.source in finalized_sources else temp, rename.source)
-            for rename, temp in temporary
+        # Restore folders first so file paths once again point into their
+        # original parent directories, then restore files and staged sidecars.
+        directory_to_restore = [
+            (
+                rename.destination
+                if rename.source in finalized_directories
+                else temp,
+                rename.source,
+            )
+            for rename, temp in directory_temporary
         ]
-        rollback_errors = _rollback_paths(media_to_restore + [(temp, deletion.path) for deletion, temp in staged_deletions])
-        outcomes.append({"old_path": "", "new_path": "", "status": "error", "error": str(exc)})
+        rollback_errors = _rollback_paths(directory_to_restore)
+        media_to_restore = [
+            (
+                rename.destination
+                if rename.source in finalized_files
+                else temp,
+                rename.source,
+            )
+            for rename, temp in file_temporary
+        ]
+        rollback_errors.extend(
+            _rollback_paths(
+                media_to_restore
+                + [
+                    (temp, deletion.path)
+                    for deletion, temp in staged_deletions
+                ]
+            )
+        )
+        outcomes.append(
+            {"old_path": "", "new_path": "", "status": "error", "error": str(exc)}
+        )
         if rollback_errors:
-            outcomes.extend({"old_path": "", "new_path": "", "status": "rollback_error", "error": error} for error in rollback_errors)
-        raise OSError(f"{exc}" + (f"; erreurs de restauration: {'; '.join(rollback_errors)}" if rollback_errors else "")) from exc
+            outcomes.extend(
+                {
+                    "old_path": "",
+                    "new_path": "",
+                    "status": "rollback_error",
+                    "error": error,
+                }
+                for error in rollback_errors
+            )
+        raise OSError(
+            f"{exc}"
+            + (
+                f"; erreurs de restauration: {'; '.join(rollback_errors)}"
+                if rollback_errors
+                else ""
+            )
+        ) from exc
     else:
+        for rename in file_renames:
+            rename.status = "renamed"
+            outcomes.append(
+                {
+                    "old_path": str(rename.source),
+                    "new_path": str(
+                        _path_after_directory_renames(
+                            rename.destination, directory_renames
+                        )
+                    ),
+                    "status": "renamed",
+                    "error": "",
+                    "kind": "file",
+                }
+            )
+        for rename in directory_renames:
+            rename.status = "renamed"
+            outcomes.append(
+                {
+                    "old_path": str(rename.source),
+                    "new_path": str(rename.destination),
+                    "status": "renamed",
+                    "error": "",
+                    "kind": "directory",
+                }
+            )
+        directory_commit_succeeded = True
+
         # Sidecars are removed only after every rename has committed.
         for deletion, temp in staged_deletions:
+            current_temp = _path_after_directory_renames(
+                temp, directory_renames
+            )
+            current_original = _path_after_directory_renames(
+                deletion.path, directory_renames
+            )
             try:
-                temp.unlink()
+                current_temp.unlink()
                 deletion.status = "deleted"
-                deletion_outcomes.append({"path": str(deletion.path), "status": "deleted", "error": ""})
+                deletion_outcomes.append(
+                    {
+                        "path": str(current_original),
+                        "status": "deleted",
+                        "error": "",
+                    }
+                )
             except OSError as exc:
                 deletion.status = "error"
                 deletion.detail = str(exc)
                 try:
-                    if not deletion.path.exists():
-                        os.replace(temp, deletion.path)
+                    if not current_original.exists():
+                        os.replace(current_temp, current_original)
                 except OSError as restore_exc:
                     deletion.detail += f"; restauration impossible: {restore_exc}"
-                deletion_outcomes.append({"path": str(deletion.path), "status": "error", "error": deletion.detail})
+                deletion_outcomes.append(
+                    {
+                        "path": str(current_original),
+                        "status": "error",
+                        "error": deletion.detail,
+                    }
+                )
     finally:
-        payload = {"created_at": datetime.now(timezone.utc).isoformat(), "operations": outcomes, "deletions": deletion_outcomes}
+        payload = {
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "scope": str(root),
+            "operations": outcomes,
+            "deletions": deletion_outcomes,
+        }
+        if directory_commit_succeeded:
+            log_path = _path_after_directory_renames(
+                log_path, directory_renames
+            )
+            undo_path = _path_after_directory_renames(
+                undo_path, directory_renames
+            )
         log_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         undo_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     return log_path, undo_path
@@ -679,39 +989,127 @@ def execute(report: Report, root: Path) -> tuple[Path, Path]:
 
 def undo(undo_path: Path, scope: Path | None = None) -> tuple[int, list[str]]:
     data = json.loads(undo_path.read_text(encoding="utf-8"))
-    operations = [(Path(x["new_path"]), Path(x["old_path"])) for x in data.get("operations", []) if x.get("status") == "renamed"]
-    if scope is not None:
-        resolved_scope = scope.resolve()
-        operations = [
-            (source, destination)
-            for source, destination in operations
-            if destination.resolve().is_relative_to(resolved_scope)
-        ]
-        if not operations:
-            return 0, [f"Aucune opération d'annulation dans le dossier: {resolved_scope}"]
-    sources = {source.resolve() for source, _ in operations}
-    errors = [f"Conflit: {destination}" for source, destination in operations if not source.exists() or (destination.exists() and destination.resolve() not in sources)]
+    entries = [
+        item
+        for item in data.get("operations", [])
+        if item.get("status") == "renamed"
+    ]
+    if scope is None:
+        return 0, ["Une annulation exige le dossier média autorisé."]
+    resolved_scope = scope.expanduser().resolve()
+    allowed_roots = {resolved_scope}
+    for item in entries:
+        if item.get("kind") != "directory":
+            continue
+        old_path = Path(item["old_path"]).expanduser().absolute()
+        if old_path == resolved_scope:
+            allowed_roots.add(Path(item["new_path"]).expanduser().resolve())
+    for item in entries:
+        for path_key in ("old_path", "new_path"):
+            candidate = Path(item[path_key]).expanduser().resolve()
+            if not any(candidate.is_relative_to(root) for root in allowed_roots):
+                return 0, [
+                    f"Chemin hors du dossier autorisé dans le journal: {candidate}"
+                ]
+    if not entries:
+        return 0, [f"Aucune opération d'annulation dans le dossier: {resolved_scope}"]
+
+    directory_operations = [
+        (Path(item["new_path"]), Path(item["old_path"]))
+        for item in entries
+        if item.get("kind") == "directory"
+    ]
+    file_operations = [
+        (Path(item["new_path"]), Path(item["old_path"]))
+        for item in entries
+        if item.get("kind") != "directory"
+    ]
+    all_sources = {
+        source.resolve()
+        for source, _ in directory_operations + file_operations
+    }
+    errors = [
+        f"Conflit: {destination}"
+        for source, destination in directory_operations + file_operations
+        if not source.exists()
+        or (
+            destination.exists()
+            and destination.resolve() not in all_sources
+        )
+    ]
     if errors:
         return 0, errors
-    temporary: list[tuple[Path, Path, Path]] = []
-    finalized_sources: set[Path] = set()
+
+    directory_temporary: list[tuple[Path, Path, Path]] = []
+    file_temporary: list[tuple[Path, Path, Path]] = []
+    finalized_directories: set[Path] = set()
+    finalized_files: set[Path] = set()
     try:
-        for source, destination in operations:
+        # Restore directory names first. File source paths are then mapped into
+        # those restored directories before their individual names are undone.
+        for source, destination in directory_operations:
             temp = source.with_name(f".{source.name}.rename-media-undo-{uuid.uuid4().hex}.tmp")
             os.replace(source, temp)
-            temporary.append((source, temp, destination))
-        for source, temp, destination in temporary:
+            directory_temporary.append((source, temp, destination))
+        for source, temp, destination in directory_temporary:
             if not _destination_is_free(destination):
                 raise FileExistsError(f"destination apparue pendant l'annulation: {destination}")
             os.replace(temp, destination)
-            finalized_sources.add(source)
-        return len(operations), []
-    except OSError as exc:
-        to_restore = [
-            (destination if source in finalized_sources else temp, source)
-            for source, temp, destination in temporary
+            finalized_directories.add(source)
+
+        reverse_directories = [
+            Rename(source, destination, "undo directory", kind="directory")
+            for source, destination in directory_operations
         ]
-        return 0, [str(exc), *_rollback_paths(to_restore)]
+        mapped_file_operations = [
+            (
+                _path_after_directory_renames(source, reverse_directories),
+                destination,
+            )
+            for source, destination in file_operations
+        ]
+        mapped_sources = {
+            source.resolve() for source, _ in mapped_file_operations
+        }
+        for source, destination in mapped_file_operations:
+            if not source.exists() or (
+                destination.exists()
+                and destination.resolve() not in mapped_sources
+            ):
+                raise FileExistsError(f"conflit pendant l'annulation: {destination}")
+            temp = source.with_name(
+                f".{source.name}.rename-media-undo-{uuid.uuid4().hex}.tmp"
+            )
+            os.replace(source, temp)
+            file_temporary.append((source, temp, destination))
+        for source, temp, destination in file_temporary:
+            if not _destination_is_free(destination):
+                raise FileExistsError(
+                    f"destination apparue pendant l'annulation: {destination}"
+                )
+            os.replace(temp, destination)
+            finalized_files.add(source)
+        return len(entries), []
+    except OSError as exc:
+        file_to_restore = [
+            (
+                destination if source in finalized_files else temp,
+                source,
+            )
+            for source, temp, destination in file_temporary
+        ]
+        rollback_errors = _rollback_paths(file_to_restore)
+        directory_to_restore = [
+            (
+                destination
+                if source in finalized_directories
+                else temp,
+                source,
+            )
+            for source, temp, destination in directory_temporary
+        ]
+        rollback_errors.extend(_rollback_paths(directory_to_restore))
+        return 0, [str(exc), *rollback_errors]
 
 
 def print_report(report: Report, verbose: bool) -> None:
@@ -732,6 +1130,10 @@ def print_report(report: Report, verbose: bool) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Import locally to keep the low-level engine usable on its own while both
+    # public interfaces share the same validated scan/apply/undo API.
+    from . import api as public_api
+
     # Windows consoles may default to a legacy code page that cannot print
     # Japanese, Korean, or other Unicode media filenames.  Keep reports
     # readable instead of failing partway through a dry-run.
@@ -751,13 +1153,27 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--movies", action="store_true")
     parser.add_argument("--series", action="store_true")
     parser.add_argument("--include-extras", action="store_true")
+    parser.add_argument(
+        "--delete-sidecars",
+        action="store_true",
+        help="propose related image/NFO deletion (off by default)",
+    )
     parser.add_argument("--verbose", action="store_true")
     parser.add_argument("--config", type=Path)
     args = parser.parse_args(argv)
     if args.movies and args.series:
         parser.error("--movies et --series ne peuvent pas être utilisés ensemble")
     if args.undo:
-        count, errors = undo(Path(args.undo), args.undo_scope)
+        if args.undo_scope:
+            count, errors = undo(Path(args.undo), args.undo_scope)
+        else:
+            if args.undo_scope is None:
+                parser.error("--undo exige --undo-scope pour autoriser le dossier restauré")
+            undo_result = public_api.undo(
+                Path(args.undo),
+                expected_scope=args.undo_scope,
+            )
+            count, errors = undo_result.restored, list(undo_result.errors)
         print(f"Annulation: {count} fichier(s) restauré(s).")
         for error in errors:
             print(error, file=sys.stderr)
@@ -768,15 +1184,74 @@ def main(argv: list[str] | None = None) -> int:
     if not root.is_dir():
         parser.error(f"dossier introuvable: {root}")
     try:
-        report = build_report(root, args.recursive, "movies" if args.movies else "series" if args.series else None, args.include_extras, args.config)
-    except ValueError as exc:
+        if args.config:
+            # Custom configuration is retained as an advanced legacy CLI
+            # feature. The standard path below is the shared public API.
+            report = build_report(
+                root,
+                args.recursive,
+                "movies" if args.movies else "series" if args.series else None,
+                args.include_extras,
+                args.config,
+                args.delete_sidecars,
+            )
+            scan_report = public_api.ScanReport(
+                public_api.ScanOptions(
+                    root.resolve(),
+                    recursive=args.recursive,
+                    media_type=(
+                        public_api.MediaScope.MOVIES
+                        if args.movies
+                        else public_api.MediaScope.SERIES
+                        if args.series
+                        else public_api.MediaScope.ALL
+                    ),
+                    include_extras=args.include_extras,
+                    include_sidecars=args.delete_sidecars,
+                ),
+                report,
+            )
+        else:
+            scan_report = public_api.scan(
+                public_api.ScanOptions(
+                    root,
+                    recursive=args.recursive,
+                    media_type=(
+                        public_api.MediaScope.MOVIES
+                        if args.movies
+                        else public_api.MediaScope.SERIES
+                        if args.series
+                        else public_api.MediaScope.ALL
+                    ),
+                    include_extras=args.include_extras,
+                    include_sidecars=args.delete_sidecars,
+                )
+            )
+            report = scan_report.engine_report
+    except (ValueError, NotADirectoryError) as exc:
         parser.error(str(exc))
     print_report(report, args.verbose)
     if args.apply:
+        selected = {
+            rename.source: rename.destination.name
+            for rename in report.renames
+            if rename.status == "proposed"
+        }
         try:
-            log_path, undo_path = execute(report, root.resolve())
-        except OSError as exc:
+            result = public_api.apply(
+                scan_report,
+                selected,
+                delete_sidecars=args.delete_sidecars,
+                selected_sidecars=(
+                    deletion.path for deletion in report.deletions
+                ),
+                history_dir=root.resolve(),
+            )
+        except (OSError, public_api.InvalidEdits) as exc:
             print(f"Erreur de renommage: {exc}", file=sys.stderr)
             return 1
-        print(f"Journal: {log_path}\nAnnulation: {undo_path}")
+        print(
+            f"Journal: {result.log_path}\n"
+            f"Annulation: {result.history_entry}"
+        )
     return 0

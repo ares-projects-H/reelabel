@@ -2,4 +2,4 @@
 # AppImage launcher. APPDIR is provided by the AppImage runtime.
 
 set -eu
-exec "$APPDIR/usr/bin/Media Renamer" "$@"
+exec "$APPDIR/usr/bin/Reelabel" "$@"

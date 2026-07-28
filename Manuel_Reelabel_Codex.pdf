@@ -1,0 +1,472 @@
+%PDF-1.4
+%âãÏÓ
+1 0 obj
+<<
+/Producer (pypdf)
+>>
+endobj
+2 0 obj
+<<
+/Type /Pages
+/Count 4
+/Kids [ 4 0 R 9 0 R 11 0 R 13 0 R ]
+>>
+endobj
+3 0 obj
+<<
+/Type /Catalog
+/Pages 2 0 R
+>>
+endobj
+4 0 obj
+<<
+/Type /Page
+/MediaBox [ 0 0 595 842 ]
+/Resources <<
+/Font <<
+/F1 5 0 R
+/F2 6 0 R
+/F3 7 0 R
+>>
+>>
+/Contents 8 0 R
+/Parent 2 0 R
+>>
+endobj
+5 0 obj
+<<
+/Type /Font
+/Subtype /Type1
+/BaseFont /Helvetica
+/Encoding /WinAnsiEncoding
+>>
+endobj
+6 0 obj
+<<
+/Type /Font
+/Subtype /Type1
+/BaseFont /Helvetica-Bold
+/Encoding /WinAnsiEncoding
+>>
+endobj
+7 0 obj
+<<
+/Type /Font
+/Subtype /Type1
+/BaseFont /Courier
+/Encoding /WinAnsiEncoding
+>>
+endobj
+8 0 obj
+<<
+/Length 1598
+>>
+stream
+BT
+1 0 0 1 48 790 Tm
+/F2 22 Tf
+(Manuel Reelabel avec Codex) Tj
+0 -14 Td
+/F1 11 Tf
+() Tj
+0 -14 Td
+(Renommer localement des vidéos et sous-titres, sans Internet.) Tj
+0 -14 Td
+() Tj
+0 -14 Td
+/F2 14 Tf
+(Principe) Tj
+0 -14 Td
+/F1 10 Tf
+() Tj
+0 -14 Td
+(Reelabel analyse un dossier, ses sous-dossiers, les vidéos et les sous-titres associés.) Tj
+0 -14 Td
+(Il nettoie les noms, normalise les épisodes et garde les extensions. Il ne modifie jamais le) Tj
+0 -14 Td
+(contenu des médias et peut proposer de renommer leurs dossiers.) Tj
+0 -14 Td
+() Tj
+0 -14 Td
+/F2 14 Tf
+(Mode recommandé : prévisualiser avant d'appliquer) Tj
+0 -14 Td
+/F1 10 Tf
+() Tj
+0 -14 Td
+(1. Demander un dry-run. Aucun fichier n'est modifié.) Tj
+0 -14 Td
+(2. Vérifier les renommages, conflits, fichiers ignorés et sous-titres manquants.) Tj
+0 -14 Td
+(3. Demander explicitement l'application seulement si le résultat convient.) Tj
+0 -14 Td
+() Tj
+0 -14 Td
+/F2 14 Tf
+(Exemples à écrire dans Codex) Tj
+0 -14 Td
+/F1 10 Tf
+() Tj
+0 -14 Td
+/F3 9 Tf
+(Utilise $reelabel pour faire un dry-run sur D:\\Media\\Films) Tj
+0 -14 Td
+(Utilise $reelabel et applique les renommages sûrs sur D:\\Media\\Anime) Tj
+0 -14 Td
+(Utilise $reelabel pour annuler le fichier rename_undo_...json) Tj
+0 -14 Td
+/F1 10 Tf
+() Tj
+0 -14 Td
+/F2 14 Tf
+(Ce que le programme reconnaît) Tj
+0 -14 Td
+/F1 10 Tf
+() Tj
+0 -14 Td
+(Vidéos : mkv, mp4, avi, mov, m4v, wmv, webm, mpg, mpeg, ts, m2ts, rmvb. Sous-titres : srt,) Tj
+0 -14 Td
+(ass, ssa, sub, vtt, idx, sup. Les paires idx/sub restent associées.) Tj
+0 -14 Td
+ET
+BT
+/F1 8 Tf
+1 0 0 1 48 30 Tm
+(Reelabel avec Codex — page 1/4) Tj
+ET
+
+endstream
+endobj
+9 0 obj
+<<
+/Type /Page
+/MediaBox [ 0 0 595 842 ]
+/Resources <<
+/Font <<
+/F1 5 0 R
+/F2 6 0 R
+/F3 7 0 R
+>>
+>>
+/Contents 10 0 R
+/Parent 2 0 R
+>>
+endobj
+10 0 obj
+<<
+/Length 1788
+>>
+stream
+BT
+1 0 0 1 48 790 Tm
+/F2 16 Tf
+(Commandes du script) Tj
+0 -14 Td
+/F1 10 Tf
+() Tj
+0 -14 Td
+/F2 11 Tf
+(Prévisualisation) Tj
+0 -14 Td
+/F3 8 Tf
+(python rename_media.py --dry-run "D:\\Media\\Films") Tj
+0 -14 Td
+/F1 9 Tf
+(Analyse sans aucune modification. À utiliser en premier.) Tj
+0 -14 Td
+() Tj
+0 -14 Td
+/F2 11 Tf
+(Application) Tj
+0 -14 Td
+/F3 8 Tf
+(python rename_media.py --apply "D:\\Media\\Films") Tj
+0 -14 Td
+/F1 9 Tf
+(Renomme uniquement les fichiers sûrs et crée un journal d'annulation.) Tj
+0 -14 Td
+() Tj
+0 -14 Td
+/F2 11 Tf
+(Annulation) Tj
+0 -14 Td
+/F3 8 Tf
+(python rename_media.py --undo "D:\\Media\\Films\\rename_undo_20260713T120000Z.json") Tj
+0 -14 Td
+/F1 9 Tf
+(Restaure les noms précédents quand la destination est disponible.) Tj
+0 -14 Td
+() Tj
+0 -14 Td
+/F2 11 Tf
+(Sans sous-dossiers) Tj
+0 -14 Td
+/F3 8 Tf
+(python rename_media.py --dry-run --no-recursive "D:\\Media\\Films") Tj
+0 -14 Td
+/F1 9 Tf
+(Limite l'analyse au dossier choisi.) Tj
+0 -14 Td
+() Tj
+0 -14 Td
+/F2 11 Tf
+(Films seulement) Tj
+0 -14 Td
+/F3 8 Tf
+(python rename_media.py --dry-run --movies "D:\\Media") Tj
+0 -14 Td
+/F1 9 Tf
+(Ignore les séries.) Tj
+0 -14 Td
+() Tj
+0 -14 Td
+/F2 11 Tf
+(Séries seulement) Tj
+0 -14 Td
+/F3 8 Tf
+(python rename_media.py --dry-run --series "D:\\Media") Tj
+0 -14 Td
+/F1 9 Tf
+(Ignore les films.) Tj
+0 -14 Td
+() Tj
+0 -14 Td
+/F2 11 Tf
+(Détails) Tj
+0 -14 Td
+/F3 8 Tf
+(python rename_media.py --dry-run --verbose "D:\\Media") Tj
+0 -14 Td
+/F1 9 Tf
+(Affiche davantage d'informations de détection.) Tj
+0 -14 Td
+() Tj
+0 -14 Td
+/F2 11 Tf
+(Extras) Tj
+0 -14 Td
+/F3 8 Tf
+(python rename_media.py --dry-run --include-extras "D:\\Media") Tj
+0 -14 Td
+/F1 9 Tf
+(Inclut explicitement trailers, samples et bonus.) Tj
+0 -14 Td
+() Tj
+0 -14 Td
+ET
+BT
+/F1 8 Tf
+1 0 0 1 48 30 Tm
+(Reelabel avec Codex — page 2/4) Tj
+ET
+
+endstream
+endobj
+11 0 obj
+<<
+/Type /Page
+/MediaBox [ 0 0 595 842 ]
+/Resources <<
+/Font <<
+/F1 5 0 R
+/F2 6 0 R
+/F3 7 0 R
+>>
+>>
+/Contents 12 0 R
+/Parent 2 0 R
+>>
+endobj
+12 0 obj
+<<
+/Length 1904
+>>
+stream
+BT
+1 0 0 1 48 790 Tm
+/F2 16 Tf
+(Règles de nommage) Tj
+0 -14 Td
+/F1 10 Tf
+() Tj
+0 -14 Td
+(Films : Titre \(Année\).extension. Séries : Titre \(Année\) S01 E01.extension. Les années,) Tj
+0 -14 Td
+(titres et numéros proviennent uniquement des noms de fichiers et de dossiers.) Tj
+0 -14 Td
+() Tj
+0 -14 Td
+/F2 12 Tf
+(Formats particuliers) Tj
+0 -14 Td
+/F1 10 Tf
+() Tj
+0 -14 Td
+(• S1E1, 1x01 et Episode 1 deviennent S01 E01.) Tj
+0 -14 Td
+(• Les épisodes fractionnaires deviennent E13-5 ; les spéciaux ordonnés restent E00.1, E00.2.) Tj
+0 -14 Td
+(• 04v2 est traité comme E04.) Tj
+0 -14 Td
+(• Chapter 1 devient Chapter 01, Chapter 10 reste Chapter 10.) Tj
+0 -14 Td
+(• Movie, Movies, OVA et OAD sont traités comme films/courts-métrages. Un OAD numéroté) Tj
+0 -14 Td
+(devient par exemple Titre OAD E01, sans S01.) Tj
+0 -14 Td
+(• Les préfixes de groupes comme [Commie] ou [SubsPlease] sont retirés.) Tj
+0 -14 Td
+(• Les suffixes de sous-titres fr, en, sdh, forced, etc. sont conservés.) Tj
+0 -14 Td
+() Tj
+0 -14 Td
+/F2 12 Tf
+(Sécurité et fichiers annexes) Tj
+0 -14 Td
+/F1 10 Tf
+() Tj
+0 -14 Td
+(Le programme ne remplace jamais un fichier existant. En cas de conflit ou de doute, il) Tj
+0 -14 Td
+(ignore le fichier et le signale. Les images et fichiers NFO restent conservés par défaut.) Tj
+0 -14 Td
+(Ils ne sont supprimés qu'avec --delete-sidecars, après une sélection explicite.) Tj
+0 -14 Td
+(Le contenu des fichiers média n'est jamais modifié.) Tj
+0 -14 Td
+() Tj
+0 -14 Td
+/F2 12 Tf
+(Journaux et sous-titres manquants) Tj
+0 -14 Td
+/F1 10 Tf
+() Tj
+0 -14 Td
+(Après --apply, rename_log_*.json enregistre l'opération et rename_undo_*.json permet) Tj
+0 -14 Td
+(l'annulation. Le rapport signale aussi les vidéos non-MKV sans sous-titre externe associé ;) Tj
+0 -14 Td
+(les MKV sont exemptés car ils peuvent contenir des sous-titres intégrés.) Tj
+0 -14 Td
+ET
+BT
+/F1 8 Tf
+1 0 0 1 48 30 Tm
+(Reelabel avec Codex — page 3/4) Tj
+ET
+
+endstream
+endobj
+13 0 obj
+<<
+/Type /Page
+/MediaBox [ 0 0 595 842 ]
+/Resources <<
+/Font <<
+/F1 5 0 R
+/F2 6 0 R
+/F3 7 0 R
+>>
+>>
+/Contents 14 0 R
+/Parent 2 0 R
+>>
+endobj
+14 0 obj
+<<
+/Length 1430
+>>
+stream
+BT
+1 0 0 1 48 790 Tm
+/F2 16 Tf
+(Installer le skill sur un autre ordinateur) Tj
+0 -14 Td
+/F1 10 Tf
+() Tj
+0 -14 Td
+(Le skill contient une copie autonome du script. Il n'est pas nécessaire de placer le projet) Tj
+0 -14 Td
+(dans chaque dossier média.) Tj
+0 -14 Td
+() Tj
+0 -14 Td
+/F2 12 Tf
+(Windows) Tj
+0 -14 Td
+/F1 10 Tf
+() Tj
+0 -14 Td
+(1. Installer Python 3.10 ou plus récent et activer Add Python to PATH.) Tj
+0 -14 Td
+(2. Copier le dossier reelabel dans C:\\Users\\<nom>\\.codex\\skills\\reelabel.) Tj
+0 -14 Td
+(3. Redémarrer Codex.) Tj
+0 -14 Td
+(4. Écrire : Utilise $reelabel pour faire un dry-run sur D:\\Media.) Tj
+0 -14 Td
+() Tj
+0 -14 Td
+/F2 12 Tf
+(macOS) Tj
+0 -14 Td
+/F1 10 Tf
+() Tj
+0 -14 Td
+(1. Installer Python, par exemple avec : brew install python.) Tj
+0 -14 Td
+(2. Copier le dossier reelabel dans ~/.codex/skills/reelabel.) Tj
+0 -14 Td
+(3. Redémarrer Codex.) Tj
+0 -14 Td
+(4. Écrire : Utilise $reelabel pour faire un dry-run sur /Volumes/Media/Films.) Tj
+0 -14 Td
+() Tj
+0 -14 Td
+/F2 12 Tf
+(Bonnes pratiques) Tj
+0 -14 Td
+/F1 10 Tf
+() Tj
+0 -14 Td
+(Toujours commencer par un dry-run. Ne lancer --apply qu'après avoir vérifié le rapport.) Tj
+0 -14 Td
+(Conserver les fichiers rename_undo_*.json tant que l'organisation n'est pas validée. Pour) Tj
+0 -14 Td
+(toute règle inhabituelle, demander d'abord un dry-run ciblé sur le dossier concerné.) Tj
+0 -14 Td
+ET
+BT
+/F1 8 Tf
+1 0 0 1 48 30 Tm
+(Reelabel avec Codex — page 4/4) Tj
+ET
+
+endstream
+endobj
+xref
+0 15
+0000000000 65535 f 
+0000000015 00000 n 
+0000000054 00000 n 
+0000000133 00000 n 
+0000000182 00000 n 
+0000000330 00000 n 
+0000000427 00000 n 
+0000000529 00000 n 
+0000000624 00000 n 
+0000002274 00000 n 
+0000002423 00000 n 
+0000004264 00000 n 
+0000004414 00000 n 
+0000006371 00000 n 
+0000006521 00000 n 
+trailer
+<<
+/Size 15
+/Root 3 0 R
+/Info 1 0 R
+>>
+startxref
+8004
+%%EOF

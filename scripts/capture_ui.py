@@ -12,8 +12,8 @@ os.environ.setdefault("QT_STYLE_OVERRIDE", "Fusion")
 from PySide6.QtGui import QFont, QFontDatabase  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
-from media_renamer.gui.main_window import MainWindow  # noqa: E402
-from media_renamer.gui.styles import stylesheet  # noqa: E402
+from reelabel.gui.main_window import MainWindow  # noqa: E402
+from reelabel.gui.styles import stylesheet  # noqa: E402
 
 
 def main() -> int:
