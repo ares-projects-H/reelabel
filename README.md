@@ -99,12 +99,6 @@ Related images and NFO files are never proposed unless
 - Conflicts and uncertain subtitle matches are reported instead of guessed.
 - An apply failure triggers automatic restoration of already staged renames.
 
-## Project checkpoints
-
-- [Validation 1 — interface prototype](docs/validation-1.md)
-- [Validation 2 — working application](docs/validation-2.md)
-- [Validation 3 — installers and GitHub release](docs/validation-3.md)
-
 ## Contributing and security
 
 Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) before
@@ -113,4 +107,7 @@ instructions in [SECURITY.md](SECURITY.md).
 
 ## License
 
-Reelabel is available under the [MIT License](LICENSE).
+Copyright © 2026 ares-projects-H.
+
+Reelabel is free software licensed under the
+[GNU General Public License v3.0 or later](LICENSE).
