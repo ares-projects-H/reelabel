@@ -15,6 +15,7 @@ def stylesheet(dark: bool = True) -> str:
             "surface": "#11182b",
             "surface_2": "#17213a",
             "border": "#263553",
+            "header_divider": "#435476",
             "text": "#f5f7ff",
             "muted": "#9aa8c7",
             "accent": "#2bc7f2",
@@ -29,6 +30,7 @@ def stylesheet(dark: bool = True) -> str:
             "surface": "#ffffff",
             "surface_2": "#edf3fa",
             "border": "#d5deeb",
+            "header_divider": "#b6c3d6",
             "text": "#16213a",
             "muted": "#64728f",
             "accent": "#087ea4",
@@ -189,6 +191,8 @@ def stylesheet(dark: bool = True) -> str:
         color: {colors["muted"]};
         border: 0;
         border-bottom: 1px solid {colors["border"]};
+        /* This visible divider also marks the draggable column resize handle. */
+        border-right: 1px solid {colors["header_divider"]};
         padding: 10px 8px;
         font-size: 11px;
         font-weight: 700;
