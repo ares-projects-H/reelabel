@@ -5,6 +5,26 @@ online metadata, modify media contents, or use analytics.
 
 For your first test, use a copied media folder rather than your only copy.
 
+## Menus and Settings
+
+On macOS, open **Reelabel → Settings…** in the menu bar at the top of the
+screen. **About Reelabel** and **Quit Reelabel** are in the same application
+menu.
+
+On Windows and Linux, open **File → Settings…** in the Reelabel window.
+**About Reelabel** and the offline user guide are under **Help**.
+
+Settings can remember:
+
+- System default, Light, or Dark appearance;
+- the default media type;
+- whether new previews include subfolders;
+- whether new previews include extras.
+
+Settings are stored only on the current computer. Related images and NFO files
+cannot be enabled by default and remain a deliberate choice for every session.
+Reelabel does not check for updates or access the network in the background.
+
 ## 1. Choose a folder
 
 Drag one folder onto the drop area, or choose **Browse**. Reelabel will show a

@@ -8,8 +8,8 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from PySide6.QtCore import QObject, QStandardPaths, Qt, QThread, Signal, Slot
-from PySide6.QtGui import QDragEnterEvent, QDropEvent, QIcon, QPixmap
+from PySide6.QtCore import QObject, QSettings, QStandardPaths, Qt, QThread, Signal, Slot
+from PySide6.QtGui import QAction, QDragEnterEvent, QDropEvent, QIcon, QKeySequence, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -37,6 +37,7 @@ from PySide6.QtWidgets import (
 
 from reelabel import api, core
 
+from .settings import SettingsDialog, load_settings, save_settings
 from .styles import stylesheet
 
 SOURCE_ROLE = int(Qt.ItemDataRole.UserRole)
@@ -221,7 +222,11 @@ class ScanWorker(QObject):
 class MainWindow(QMainWindow):
     """Modern interface for previewing and safely applying media renames."""
 
-    def __init__(self, demo: bool = False) -> None:
+    def __init__(
+        self,
+        demo: bool = False,
+        settings_store: QSettings | None = None,
+    ) -> None:
         super().__init__()
         self.setWindowTitle("Reelabel")
         self.setMinimumSize(1040, 700)
@@ -230,11 +235,12 @@ class MainWindow(QMainWindow):
         if icon_path.exists():
             self.setWindowIcon(QIcon(str(icon_path)))
 
-        app = QApplication.instance()
-        dark = True
-        if app is not None:
-            dark = app.palette().window().color().lightness() < 145
-        self.setStyleSheet(stylesheet(dark=dark))
+        self._settings_store = settings_store or QSettings(
+            "ares-projects-H",
+            "Reelabel",
+        )
+        self._preferences = load_settings(self._settings_store)
+        self._apply_theme()
 
         self.current_report: api.ScanReport | None = None
         self._scan_thread: QThread | None = None
@@ -245,10 +251,40 @@ class MainWindow(QMainWindow):
         self._sort_order = Qt.SortOrder.AscendingOrder
         self.filter_buttons: dict[str, QPushButton] = {}
         self._build_ui()
+        self._build_menus()
+        self._apply_scan_defaults()
         if demo:
             self._load_demo()
         else:
             self._show_empty_state()
+
+    def _system_uses_dark_theme(self) -> bool:
+        """Return the operating system's current light/dark palette choice."""
+
+        app = QApplication.instance()
+        return app is None or app.palette().window().color().lightness() < 145
+
+    def _apply_theme(self) -> None:
+        """Apply the selected appearance without changing the system palette."""
+
+        if self._preferences.appearance == "system":
+            dark = self._system_uses_dark_theme()
+        else:
+            dark = self._preferences.appearance == "dark"
+        self.setStyleSheet(stylesheet(dark=dark))
+
+    def _apply_scan_defaults(self) -> None:
+        """Copy saved scan defaults into the main-window controls."""
+
+        scope_index = {"all": 0, "movies": 1, "series": 2}[
+            self._preferences.media_scope
+        ]
+        self.media_type.setCurrentIndex(scope_index)
+        self.recursive.setChecked(self._preferences.recursive)
+        self.extras.setChecked(self._preferences.include_extras)
+        # Related image/NFO discovery is intentionally not configurable as a
+        # default. It must remain a deliberate choice in every session.
+        self.sidecars.setChecked(False)
 
     def _build_ui(self) -> None:
         root = QWidget()
@@ -378,6 +414,125 @@ class MainWindow(QMainWindow):
         page.addLayout(footer)
 
         self.setCentralWidget(root)
+
+    def _build_menus(self) -> None:
+        """Create cross-platform menus with native macOS application roles."""
+
+        menu_bar = self.menuBar()
+        menu_bar.setNativeMenuBar(True)
+
+        self.file_menu = menu_bar.addMenu("&File")
+
+        self.choose_folder_action = QAction("Choose Folder…", self)
+        self.choose_folder_action.setShortcut(QKeySequence.StandardKey.Open)
+        self.choose_folder_action.triggered.connect(self._browse)
+        self.file_menu.addAction(self.choose_folder_action)
+
+        self.preview_action = QAction("Preview Changes", self)
+        self.preview_action.setShortcut(QKeySequence("Ctrl+R"))
+        self.preview_action.triggered.connect(self._scan_or_cancel)
+        self.file_menu.addAction(self.preview_action)
+
+        self.history_action = QAction("History / Undo…", self)
+        self.history_action.triggered.connect(self._show_history)
+        self.file_menu.addAction(self.history_action)
+
+        self.file_menu.addSeparator()
+        self.settings_action = QAction("Settings…", self)
+        # PreferencesRole moves this action into Reelabel → Settings… on macOS.
+        self.settings_action.setMenuRole(QAction.MenuRole.PreferencesRole)
+        self.settings_action.triggered.connect(self._show_settings)
+        self.file_menu.addAction(self.settings_action)
+
+        self.file_menu.addSeparator()
+        self.quit_action = QAction("Quit Reelabel", self)
+        self.quit_action.setShortcut(QKeySequence.StandardKey.Quit)
+        self.quit_action.setMenuRole(QAction.MenuRole.QuitRole)
+        self.quit_action.triggered.connect(QApplication.quit)
+        self.file_menu.addAction(self.quit_action)
+
+        self.help_menu = menu_bar.addMenu("&Help")
+        self.user_guide_action = QAction("Reelabel User Guide", self)
+        self.user_guide_action.setShortcut(QKeySequence.StandardKey.HelpContents)
+        self.user_guide_action.triggered.connect(self._show_user_guide)
+        self.help_menu.addAction(self.user_guide_action)
+
+        self.help_menu.addSeparator()
+        self.about_action = QAction("About Reelabel", self)
+        # AboutRole moves this action into Reelabel → About Reelabel on macOS.
+        self.about_action.setMenuRole(QAction.MenuRole.AboutRole)
+        self.about_action.triggered.connect(self._show_about)
+        self.help_menu.addAction(self.about_action)
+
+    def _show_settings(self) -> None:
+        """Open persistent, local-only interface and scan preferences."""
+
+        dialog = SettingsDialog(self._preferences, self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        self._preferences = dialog.values()
+        save_settings(self._settings_store, self._preferences)
+        self._apply_theme()
+        self._apply_scan_defaults()
+        self.notice.setText("✓ Settings saved locally")
+
+    def _show_about(self) -> None:
+        """Show the application identity and its offline privacy promise."""
+
+        message = QMessageBox(self)
+        message.setWindowTitle("About Reelabel")
+        logo = QPixmap(str(project_asset("reelabel-icon.png")))
+        if not logo.isNull():
+            message.setIconPixmap(
+                logo.scaled(
+                    72,
+                    72,
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation,
+                )
+            )
+        message.setText("<b>Reelabel 0.1.0</b>")
+        message.setInformativeText(
+            "A safe, offline desktop app for previewing and renaming local "
+            "media files.\n\nLicensed under GPL-3.0-or-later.\n"
+            "No analytics, telemetry, or automatic network access."
+        )
+        message.setStandardButtons(QMessageBox.StandardButton.Ok)
+        message.exec()
+
+    def _show_user_guide(self) -> None:
+        """Display a concise guide without opening a website or network link."""
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Reelabel User Guide")
+        dialog.resize(620, 480)
+        layout = QVBoxLayout(dialog)
+        guide = QLabel(
+            "<h2>Safe first use</h2>"
+            "<ol>"
+            "<li>Choose or drop a copied media folder.</li>"
+            "<li>Select the media type and scan options.</li>"
+            "<li>Choose <b>Preview Changes</b>; no files change yet.</li>"
+            "<li>Double-click a <b>Proposed name</b> to edit it.</li>"
+            "<li>Uncheck anything you do not want to rename.</li>"
+            "<li>Apply only after every selected row is marked Ready.</li>"
+            "</ol>"
+            "<p><b>History / Undo</b> can restore successful rename operations "
+            "without overwriting files.</p>"
+            "<p>Related images and NFO files stay disabled and unchecked by "
+            "default.</p>"
+        )
+        guide.setWordWrap(True)
+        guide.setTextFormat(Qt.TextFormat.RichText)
+        layout.addWidget(guide, 1)
+        close = QPushButton("Close")
+        close.setObjectName("primary")
+        close.clicked.connect(dialog.accept)
+        buttons = QHBoxLayout()
+        buttons.addStretch()
+        buttons.addWidget(close)
+        layout.addLayout(buttons)
+        dialog.exec()
 
     def _header(self) -> QHBoxLayout:
         header = QHBoxLayout()

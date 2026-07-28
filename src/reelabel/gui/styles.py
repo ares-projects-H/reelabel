@@ -46,6 +46,32 @@ def stylesheet(dark: bool = True) -> str:
     QMainWindow, QWidget#root, QDialog, QMessageBox {{
         background: {colors["window"]};
     }}
+    QMenuBar {{
+        background: {colors["window"]};
+        color: {colors["text"]};
+    }}
+    QMenuBar::item:selected {{
+        background: {colors["surface_2"]};
+        border-radius: 5px;
+    }}
+    QMenu {{
+        background: {colors["surface"]};
+        color: {colors["text"]};
+        border: 1px solid {colors["border"]};
+        padding: 5px;
+    }}
+    QMenu::item {{
+        padding: 7px 28px 7px 12px;
+        border-radius: 5px;
+    }}
+    QMenu::item:selected {{
+        background: {colors["surface_2"]};
+    }}
+    QMenu::separator {{
+        height: 1px;
+        background: {colors["border"]};
+        margin: 5px 8px;
+    }}
     QMessageBox QLabel#qt_msgbox_label,
     QMessageBox QLabel#qt_msgbox_informativelabel {{
         min-width: 420px;
@@ -70,6 +96,10 @@ def stylesheet(dark: bool = True) -> str:
     }}
     QLabel#title {{
         font-size: 28px;
+        font-weight: 750;
+    }}
+    QLabel#dialogTitle {{
+        font-size: 22px;
         font-weight: 750;
     }}
     QLabel#subtitle, QLabel#muted, QLabel#pathHint {{

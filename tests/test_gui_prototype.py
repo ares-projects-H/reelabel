@@ -9,11 +9,13 @@ PYSIDE_AVAILABLE = importlib.util.find_spec("PySide6") is not None
 
 if PYSIDE_AVAILABLE:
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-    from PySide6.QtCore import Qt
+    from PySide6.QtCore import QSettings, Qt
+    from PySide6.QtGui import QAction
     from PySide6.QtWidgets import QApplication, QHeaderView, QMessageBox
 
     from reelabel import api
     from reelabel.gui.main_window import DEMO_ROWS, MainWindow
+    from reelabel.gui.settings import SettingsValues, load_settings, save_settings
     from reelabel.gui.styles import stylesheet
 
 
@@ -64,6 +66,22 @@ class GuiPrototypeTests(unittest.TestCase):
 
     def test_theme_uses_the_platform_font(self) -> None:
         self.assertNotIn("Inter", stylesheet())
+
+    def test_native_application_menu_roles_exist(self) -> None:
+        window = MainWindow(demo=False)
+        self.assertEqual(
+            window.settings_action.menuRole(),
+            QAction.MenuRole.PreferencesRole,
+        )
+        self.assertEqual(window.about_action.menuRole(), QAction.MenuRole.AboutRole)
+        self.assertEqual(window.quit_action.menuRole(), QAction.MenuRole.QuitRole)
+        # On Windows and Linux these actions stay in the visible File and Help
+        # menus. macOS relocates them using the native roles checked above.
+        self.assertIn(window.settings_action, window.file_menu.actions())
+        self.assertIn(window.quit_action, window.file_menu.actions())
+        self.assertIn(window.about_action, window.help_menu.actions())
+        self.assertIn(window.user_guide_action, window.help_menu.actions())
+        window.close()
 
     def test_batch_edit_preserves_episode_numbers(self) -> None:
         window = MainWindow(demo=False)
@@ -219,3 +237,23 @@ def test_editing_a_movie_can_update_related_subtitles(qtbot, tmp_path: Path, mon
     assert edited_movie in proposals
     for subtitle in original_subtitles:
         assert (Path(edited_movie).stem + subtitle[len(Path(original_movie).stem) :]) in proposals
+
+
+@unittest.skipUnless(PYSIDE_AVAILABLE, "PySide6 is not installed")
+def test_settings_persist_and_apply_safe_defaults(qtbot, tmp_path: Path) -> None:
+    store = QSettings(str(tmp_path / "reelabel-test.ini"), QSettings.Format.IniFormat)
+    expected = SettingsValues(
+        appearance="light",
+        media_scope="series",
+        recursive=False,
+        include_extras=True,
+    )
+    save_settings(store, expected)
+
+    assert load_settings(store) == expected
+    window = MainWindow(demo=False, settings_store=store)
+    qtbot.addWidget(window)
+    assert window.media_type.currentText() == "Series only"
+    assert not window.recursive.isChecked()
+    assert window.extras.isChecked()
+    assert not window.sidecars.isChecked()
