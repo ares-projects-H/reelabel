@@ -154,7 +154,7 @@ jobs:
         run: |
           sudo apt-get install --yes \
             ./release/Reelabel-0.1.0-Ubuntu-24.04-x86_64.deb
-          REELABEL_SMOKE_TEST=1 QT_QPA_PLATFORM=offscreen reelabel
+          REELABEL_SMOKE_TEST=1 QT_QPA_PLATFORM=offscreen /usr/bin/reelabel
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
