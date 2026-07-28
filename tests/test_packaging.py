@@ -41,6 +41,7 @@ def test_release_workflow_covers_every_public_package() -> None:
         "Reelabel-0.1.0-macOS-${{ matrix.architecture }}.dmg",
         "Reelabel-0.1.0-Linux-x86_64.AppImage",
         "Reelabel-0.1.0-Ubuntu-24.04-x86_64.deb",
+        "QT_QPA_PLATFORM=offscreen /usr/bin/reelabel",
     ):
         assert expected in workflow
 
