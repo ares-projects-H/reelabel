@@ -75,5 +75,5 @@ Opening a pull request does not give a contributor permission to publish a
 release or write directly to the official repository. Every change is reviewed
 before it is merged.
 
-By contributing, you agree that your contribution is provided under the MIT
-License included in this repository.
+By contributing, you agree that your contribution is provided under the
+[GNU General Public License v3.0 or later](LICENSE) used by this repository.
