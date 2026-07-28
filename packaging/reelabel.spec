@@ -24,6 +24,8 @@ a = Analysis(
     binaries=[],
     datas=[
         (str(ASSETS / "reelabel-icon.png"), "assets"),
+        # Ship the complete GPL text with every packaged application.
+        (str(PROJECT_ROOT / "LICENSE"), "."),
     ],
     hiddenimports=[],
     hookspath=[],
