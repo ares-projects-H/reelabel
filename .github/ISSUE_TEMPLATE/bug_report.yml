@@ -16,7 +16,8 @@ body:
         - Windows 10/11 x64
         - macOS Apple Silicon
         - macOS Intel
-        - Linux x86_64
+        - Ubuntu 24.04 x86_64 DEB
+        - Linux x86_64 AppImage
         - Source development
     validations:
       required: true

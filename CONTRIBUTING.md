@@ -27,6 +27,9 @@ The usual workflow is:
 7. Push your branch to your fork.
 8. Open a pull request and explain what you changed.
 
+You remain in control of your fork. The Reelabel owner remains in control of
+the official repository and must explicitly review and merge a pull request.
+
 ## Before opening a change
 
 - Search existing issues to avoid duplicate work.
@@ -36,6 +39,9 @@ The usual workflow is:
 - Keep the public interface and documentation in English.
 - Use invented media titles in tests, examples, and screenshots. Do not include
   personal media libraries, copyrighted artwork, or media files.
+- Discuss new third-party dependencies before adding them.
+- Never add API keys, passwords, tokens, analytics identifiers, or private
+  filesystem paths to code, tests, screenshots, logs, or pull requests.
 
 ## Development setup
 
@@ -73,7 +79,17 @@ unrelated changes in separate pull requests.
 
 Opening a pull request does not give a contributor permission to publish a
 release or write directly to the official repository. Every change is reviewed
-before it is merged.
+before it is merged. Automated checks are helpful, but a passing check does not
+replace human review.
+
+For security:
+
+- do not ask maintainers to run an unknown executable;
+- provide source changes and reproducible test instructions;
+- do not weaken overwrite prevention, rollback, validation, or confirmation;
+- do not introduce background networking, update checks, or telemetry;
+- report possible vulnerabilities privately as described in
+  [SECURITY.md](SECURITY.md), not in a public issue.
 
 By contributing, you agree that your contribution is provided under the
 [GNU General Public License v3.0 or later](LICENSE) used by this repository.
