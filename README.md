@@ -1,4 +1,8 @@
-# Reelabel
+<p align="center">
+  <img src="assets/reelabel-icon.png" alt="Reelabel logo" width="160">
+</p>
+
+<h1 align="center">Reelabel</h1>
 
 Reelabel is a safe, offline desktop utility for cleaning the names of
 movie, series, and subtitle files, as well as their containing release folders.
