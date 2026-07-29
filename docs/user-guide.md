@@ -94,6 +94,24 @@ Undo refuses to overwrite a file that appeared after the original operation.
 appear separately and remain unchecked. Deleting selected related files
 requires a second confirmation.
 
+## Application menus and Settings
+
+On macOS, application commands appear in the system menu bar at the top of the
+screen:
+
+- **Reelabel → Preferences…** opens the Reelabel Settings screen.
+- **Reelabel → About Reelabel** shows the version, license, and privacy summary.
+- **Reelabel → Quit Reelabel** safely closes the application.
+- **File** contains Choose Folder, Preview Changes, and History / Undo.
+- **Help → Reelabel User Guide** opens a concise offline guide.
+
+On Windows and Linux, these commands appear in the Reelabel window's menu bar.
+
+Settings are stored only on the current computer. You can choose System
+default, Light, or Dark appearance and set default media type, subfolder, and
+extras options. Related image/NFO discovery cannot be enabled as a saved
+default.
+
 ## Getting help
 
 Before reporting a problem:

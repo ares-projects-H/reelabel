@@ -15,6 +15,7 @@ def test_public_version_is_consistent() -> None:
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     assert project["project"]["version"] == "0.1.0"
     assert project["project"]["name"] == "reelabel"
+    assert project["project"]["license"] == "MIT"
     assert "reelabel" in project["project"]["scripts"]
     assert "reelabel-gui" in project["project"]["scripts"]
     assert reelabel.__version__ == "0.1.0"

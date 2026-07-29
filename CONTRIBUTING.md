@@ -7,6 +7,13 @@ You do not need direct access to the repository to contribute. GitHub reviews
 changes through a **pull request** before they can become part of the project.
 The project owner decides whether each pull request is accepted.
 
+## Maintainer availability
+
+Reelabel is maintained in personal time. Issues and pull requests are welcome,
+but reviews may take several days or longer. Opening an issue or pull request
+does not guarantee that a change will be accepted. Please discuss large
+changes in an issue first and keep pull requests focused.
+
 ## Your first contribution
 
 If this is your first GitHub contribution, these terms may help:
@@ -71,6 +78,17 @@ QT_QPA_PLATFORM=offscreen pytest
   and public APIs.
 - Keep GUI and command-line behavior on the shared public API.
 
+## AI-assisted contributions
+
+AI-assisted contributions are welcome, but contributors are responsible for
+understanding, testing, and explaining every submitted change. Do not submit
+generated code that you have not reviewed or tested.
+
+Any use of an AI development tool must still follow the security, privacy,
+licensing, testing, and invented-example requirements in this guide. Never
+paste private media names, secrets, credentials, or unpublished security
+reports into a third-party AI service.
+
 ## Pull requests
 
 Describe what changed, why it is safe, representative before/after filenames,
@@ -92,4 +110,8 @@ For security:
   [SECURITY.md](SECURITY.md), not in a public issue.
 
 By contributing, you agree that your contribution is provided under the
-[GNU General Public License v3.0 or later](LICENSE) used by this repository.
+[MIT License](LICENSE) used by this repository.
+
+The MIT License covers the software, but it does not grant permission to
+present a fork as an official Reelabel release. Forks must follow the
+[Reelabel branding guidelines](TRADEMARKS.md).
