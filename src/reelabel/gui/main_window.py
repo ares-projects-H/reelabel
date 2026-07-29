@@ -494,7 +494,7 @@ class MainWindow(QMainWindow):
         message.setText("<b>Reelabel 0.1.0</b>")
         message.setInformativeText(
             "A safe, offline desktop app for previewing and renaming local "
-            "media files.\n\nLicensed under GPL-3.0-or-later.\n"
+            "media files.\n\nLicensed under the MIT License.\n"
             "No analytics, telemetry, or automatic network access."
         )
         message.setStandardButtons(QMessageBox.StandardButton.Ok)

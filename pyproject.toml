@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "A safe, offline desktop app for previewing and renaming local media files."
 readme = "README.md"
 requires-python = ">=3.10"
-license = "GPL-3.0-or-later"
+license = "MIT"
 authors = [{ name = "ares-projects-H" }]
 keywords = ["media", "rename", "subtitles", "desktop", "offline"]
 classifiers = [

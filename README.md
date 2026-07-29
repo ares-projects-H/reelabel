@@ -6,7 +6,7 @@
 
 <p align="center">
   <a href="https://github.com/ares-projects-H/reelabel/actions/workflows/ci.yml"><img alt="Tests" src="https://github.com/ares-projects-H/reelabel/actions/workflows/ci.yml/badge.svg"></a>
-  <a href="LICENSE"><img alt="License: GPL-3.0-or-later" src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue.svg"></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
 </p>
 
 Reelabel is a safe, offline desktop utility for cleaning the names of
@@ -29,6 +29,7 @@ Reelabel includes:
 - an editable before/after preview with working Ready, Review, and Ignored filters;
 - preview columns that can be resized by dragging and sorted by clicking their
   headers;
+- native application menus and local appearance/scan-default settings;
 - proposed names that can be edited by double-clicking a cell in the
   **Proposed name** column;
 - editable folder-name proposals for movies, series, and other media collections;
@@ -73,8 +74,9 @@ safety warning, read the [first-time user guide](docs/user-guide.md).
 
 ## Settings
 
-On macOS, use **Reelabel → Settings…** in the system menu bar. On Windows and
-Linux, use **File → Settings…** in the application window.
+On macOS, use **Reelabel → Preferences…** in the system menu bar. This opens
+the **Reelabel Settings** screen. On Windows and Linux, use
+**File → Settings…** in the application window.
 
 Reelabel can remember the System/Light/Dark appearance and conservative scan
 defaults. Settings remain local and cannot enable related image/NFO handling
@@ -124,22 +126,30 @@ Related images and NFO files are never proposed unless
 
 Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) before
 opening a pull request. A contribution cannot change the official application
-until the owner has reviewed and merged it.
+until the owner has reviewed and merged it. Reelabel is maintained in personal
+time, so reviews may take several days or longer.
 
 Please report security problems privately using the instructions in
 [SECURITY.md](SECURITY.md). Maintainers can follow the
 [safe GitHub review and release guide](docs/maintainer-guide.md).
 
-## Support Reelabel
+## Contributors
 
-Reelabel will remain free and open source. If it saves you time, you can
-optionally support its maintenance through
-[GitHub Sponsors](https://github.com/sponsors/ares-projects-H). Sponsorship
-does not unlock features or affect which contributions are accepted.
+Community contributors are credited after their changes are merged:
+
+<a href="https://github.com/ares-projects-H/reelabel/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=ares-projects-H/reelabel" alt="Reelabel contributors">
+</a>
 
 ## License
 
 Copyright © 2026 ares-projects-H.
 
-Reelabel is free software licensed under the
-[GNU General Public License v3.0 or later](LICENSE).
+Reelabel is licensed under the [MIT License](LICENSE). The Reelabel name and
+logo identify the official project; see [TRADEMARKS.md](TRADEMARKS.md) for
+branding guidelines for forks and redistributions.
+
+---
+
+Designed, tested, and maintained by a human, with substantial development
+assistance from OpenAI Codex.
