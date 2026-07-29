@@ -84,9 +84,13 @@ On macOS, use **Reelabel → Preferences…** in the system menu bar. This opens
 the **Reelabel Settings** screen. On Windows and Linux, use
 **File → Settings…** in the application window.
 
-Reelabel can remember the System/Light/Dark appearance and conservative scan
-defaults. Settings remain local and cannot enable related image/NFO handling
-by default, analytics, background networking, or automatic updates.
+Reelabel can remember the System/Light/Dark appearance, conservative scan
+defaults, and whether to show the rename confirmation. Choosing
+**Don't show again** in that confirmation can be reversed in Settings.
+Destination validation, automatic restoration, History / Undo, and the
+separate image/NFO deletion confirmation are never disabled by this option.
+Settings remain local and cannot enable analytics, background networking, or
+automatic updates.
 
 ## Run from source for development
 

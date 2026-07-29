@@ -44,7 +44,10 @@ Always begin with a copied test folder.
 ## Confirmation
 
 The apply confirmation uses the Reelabel logo for better contrast in dark
-mode and explains the safety behavior in plain language.
+mode, explains the safety behavior in plain language, and offers **Don't show
+again**. The reminder can be restored in Settings without disabling
+destination checks, rollback, History / Undo, or the separate image/NFO
+deletion confirmation.
 
 ![Reelabel apply confirmation](screenshots/confirmation-preview.png)
 

@@ -114,6 +114,11 @@ def stylesheet(dark: bool = True) -> str:
         font-size: 22px;
         font-weight: 750;
     }}
+    QLabel#sectionTitle {{
+        color: {colors["accent"]};
+        font-size: 12px;
+        font-weight: 700;
+    }}
     QLabel#subtitle, QLabel#muted, QLabel#pathHint {{
         color: {colors["muted"]};
     }}
@@ -233,6 +238,26 @@ def stylesheet(dark: bool = True) -> str:
     QTableWidget::item {{
         border-bottom: 1px solid {colors["border"]};
         padding: 7px;
+    }}
+    QListWidget {{
+        background: {colors["surface"]};
+        color: {colors["text"]};
+        border: 1px solid {colors["border"]};
+        border-radius: 10px;
+        outline: none;
+        padding: 4px;
+        selection-background-color: rgba(43, 199, 242, 0.16);
+    }}
+    QListWidget::item {{
+        border-bottom: 1px solid {colors["border"]};
+        padding: 9px 8px;
+    }}
+    QListWidget::item:selected {{
+        background: rgba(43, 199, 242, 0.16);
+        color: {colors["text"]};
+    }}
+    QListWidget::item:disabled {{
+        color: {colors["muted"]};
     }}
     QStatusBar {{
         background: {colors["surface"]};

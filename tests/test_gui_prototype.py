@@ -10,12 +10,12 @@ PYSIDE_AVAILABLE = importlib.util.find_spec("PySide6") is not None
 
 if PYSIDE_AVAILABLE:
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-    from PySide6.QtCore import QSettings, Qt
+    from PySide6.QtCore import QSettings, Qt, QTimer
     from PySide6.QtGui import QAction
     from PySide6.QtWidgets import QApplication, QHeaderView, QMessageBox
 
     from reelabel import api
-    from reelabel.gui.main_window import DEMO_ROWS, MainWindow
+    from reelabel.gui.main_window import DEMO_ROWS, KIND_ROLE, MainWindow
     from reelabel.gui.settings import (
         SettingsDialog,
         SettingsValues,
@@ -84,6 +84,8 @@ class GuiPrototypeTests(unittest.TestCase):
             self.assertIn("selection-color: #07101d;", theme)
             self.assertIn("QToolTip {", theme)
             self.assertIn("QScrollBar:vertical, QScrollBar:horizontal {", theme)
+            self.assertIn("QListWidget {", theme)
+            self.assertIn("QListWidget::item:disabled {", theme)
 
     def test_settings_dropdowns_fit_their_complete_labels(self) -> None:
         dialog = SettingsDialog(SettingsValues())
@@ -165,6 +167,23 @@ class GuiPrototypeTests(unittest.TestCase):
                 "Another Movie (2018).srt",
             )
         )
+        window.close()
+
+    def test_permanent_deletion_confirmation_defaults_to_cancel(self) -> None:
+        window = MainWindow(demo=False)
+        message, accept = window._confirmation_dialog(
+            "Permanently delete related files?",
+            "Delete one selected image?",
+            "This deletion cannot be undone.",
+            "Delete permanently",
+            accept_is_default=False,
+        )
+        self.assertIsNot(message.defaultButton(), accept)
+        self.assertIs(
+            message.defaultButton(),
+            message.button(QMessageBox.StandardButton.Cancel),
+        )
+        message.close()
         window.close()
 
 
@@ -292,6 +311,7 @@ def test_settings_persist_and_apply_safe_defaults(qtbot, tmp_path: Path) -> None
         media_scope="series",
         recursive=False,
         include_extras=True,
+        show_apply_confirmation=False,
     )
     save_settings(store, expected)
 
@@ -302,3 +322,76 @@ def test_settings_persist_and_apply_safe_defaults(qtbot, tmp_path: Path) -> None
     assert not window.recursive.isChecked()
     assert window.extras.isChecked()
     assert not window.sidecars.isChecked()
+    assert not window._preferences.show_apply_confirmation
+
+
+@unittest.skipUnless(PYSIDE_AVAILABLE, "PySide6 is not installed")
+def test_apply_confirmation_opt_out_can_be_restored(
+    qtbot,
+    tmp_path: Path,
+) -> None:
+    store = QSettings(str(tmp_path / "confirmation-test.ini"), QSettings.Format.IniFormat)
+    window = MainWindow(demo=False, settings_store=store)
+    qtbot.addWidget(window)
+
+    def accept_and_hide() -> None:
+        message = QApplication.activeModalWidget()
+        assert isinstance(message, QMessageBox)
+        checkbox = message.checkBox()
+        assert checkbox is not None
+        assert checkbox.text() == "Don't show again"
+        checkbox.setChecked(True)
+        accept = next(
+            button
+            for button in message.buttons()
+            if message.buttonRole(button) == QMessageBox.ButtonRole.AcceptRole
+        )
+        accept.click()
+
+    QTimer.singleShot(0, accept_and_hide)
+    assert window._confirm_apply_changes(
+        "Rename 2 files?",
+        "Every destination will be checked again.",
+    )
+    assert not window._preferences.show_apply_confirmation
+    assert not load_settings(store).show_apply_confirmation
+
+    restored = SettingsDialog(load_settings(store), window)
+    restored.apply_confirmation.setChecked(True)
+    save_settings(store, restored.values())
+    assert load_settings(store).show_apply_confirmation
+
+
+@unittest.skipUnless(PYSIDE_AVAILABLE, "PySide6 is not installed")
+def test_hiding_apply_reminder_does_not_hide_sidecar_warning(
+    qtbot,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    (tmp_path / "Aurora.Archive.2026.mkv").touch()
+    poster = tmp_path / "poster.jpg"
+    poster.touch()
+    store = QSettings(str(tmp_path / "sidecar-test.ini"), QSettings.Format.IniFormat)
+    save_settings(store, SettingsValues(show_apply_confirmation=False))
+    report = api.scan(api.ScanOptions(tmp_path, include_sidecars=True))
+    window = MainWindow(demo=False, settings_store=store)
+    qtbot.addWidget(window)
+    window.current_report = report
+    window._populate_report(report)
+
+    for row in range(window.table.rowCount()):
+        if window.table.item(row, 1).data(KIND_ROLE) == "sidecar":
+            window.table.item(row, 0).setCheckState(Qt.CheckState.Checked)
+
+    confirmations: list[tuple[str, str, str, str]] = []
+    monkeypatch.setattr(
+        window,
+        "_confirm_action",
+        lambda *args: confirmations.append(args) or False,
+    )
+    window._apply_selected()
+
+    assert confirmations
+    assert confirmations[0][0] == "Permanently delete related files?"
+    assert confirmations[0][4] is True
+    assert poster.exists()
