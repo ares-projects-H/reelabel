@@ -45,7 +45,12 @@ open its menu, and choose **Uninstall**.
    - `arm64` for Apple Silicon;
    - `x86_64` for Intel.
 2. Open the DMG and drag **Reelabel** into **Applications**.
-3. Open Reelabel from Applications.
+3. Wait for the copy to finish, then eject the Reelabel disk image.
+4. Open Reelabel from the **Applications** folder.
+
+Opening Reelabel directly from the DMG only runs the temporary copy; it does
+not install the application. Always drag it onto the Applications shortcut
+shown in the installer window first.
 
 The first application is unsigned. If macOS blocks the first launch, verify the
 SHA-256 value, Control-click the app in Finder, choose **Open**, then confirm

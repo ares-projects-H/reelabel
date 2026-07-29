@@ -31,6 +31,19 @@ def test_native_icons_have_expected_headers() -> None:
     assert macos_icon[:4] == b"icns"
 
 
+def test_macos_dmg_requires_dragging_to_applications() -> None:
+    build_script = (PROJECT_ROOT / "packaging" / "macos" / "build_dmg.sh").read_text(
+        encoding="utf-8"
+    )
+    for expected in (
+        "command -v create-dmg",
+        '--icon "Reelabel.app" 170 190',
+        "--app-drop-link 490 190",
+        '--volicon "$PROJECT_ROOT/assets/reelabel-icon.icns"',
+    ):
+        assert expected in build_script
+
+
 def test_release_workflow_covers_every_public_package() -> None:
     workflow = (PROJECT_ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
     for expected in (
@@ -44,6 +57,7 @@ def test_release_workflow_covers_every_public_package() -> None:
         "Reelabel-0.1.0-Ubuntu-24.04-x86_64.deb",
         "REELABEL_SMOKE_TEST_SETTINGS",
         "QT_QPA_PLATFORM=offscreen /usr/bin/reelabel",
+        "brew install create-dmg",
     ):
         assert expected in workflow
 

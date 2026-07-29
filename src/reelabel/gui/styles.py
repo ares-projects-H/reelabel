@@ -69,10 +69,20 @@ def stylesheet(dark: bool = True) -> str:
     QMenu::item:selected {{
         background: {colors["surface_2"]};
     }}
+    QMenu::item:disabled {{
+        color: {colors["muted"]};
+    }}
     QMenu::separator {{
         height: 1px;
         background: {colors["border"]};
         margin: 5px 8px;
+    }}
+    QToolTip {{
+        background: {colors["surface"]};
+        color: {colors["text"]};
+        border: 1px solid {colors["border"]};
+        border-radius: 5px;
+        padding: 5px 7px;
     }}
     QMessageBox QLabel#qt_msgbox_label,
     QMessageBox QLabel#qt_msgbox_informativelabel {{
@@ -133,6 +143,29 @@ def stylesheet(dark: bool = True) -> str:
     }}
     QLineEdit:focus, QComboBox:focus {{
         border-color: {colors["accent"]};
+    }}
+    /*
+     * A combo box popup is a separate Qt window. Styling its view explicitly
+     * prevents a dark system palette from leaking into Reelabel's light theme
+     * (and the reverse) after the appearance is changed at runtime.
+     */
+    QComboBox QAbstractItemView {{
+        background: {colors["surface"]};
+        color: {colors["text"]};
+        border: 1px solid {colors["border"]};
+        border-radius: 6px;
+        outline: none;
+        padding: 4px;
+        selection-background-color: {colors["accent"]};
+        selection-color: #07101d;
+    }}
+    QComboBox QAbstractItemView::item {{
+        min-height: 26px;
+        padding: 4px 8px;
+    }}
+    QLineEdit:disabled, QComboBox:disabled {{
+        background: {colors["surface"]};
+        color: {colors["muted"]};
     }}
     QCheckBox {{
         spacing: 8px;
@@ -205,5 +238,24 @@ def stylesheet(dark: bool = True) -> str:
         background: {colors["surface"]};
         color: {colors["muted"]};
         border-top: 1px solid {colors["border"]};
+    }}
+    QScrollBar:vertical, QScrollBar:horizontal {{
+        background: {colors["surface"]};
+        border: 0;
+        margin: 0;
+    }}
+    QScrollBar::handle:vertical, QScrollBar::handle:horizontal {{
+        background: {colors["header_divider"]};
+        border-radius: 5px;
+        min-height: 24px;
+        min-width: 24px;
+    }}
+    QScrollBar::handle:hover {{
+        background: {colors["muted"]};
+    }}
+    QScrollBar::add-line, QScrollBar::sub-line,
+    QScrollBar::add-page, QScrollBar::sub-page {{
+        border: 0;
+        background: transparent;
     }}
     """

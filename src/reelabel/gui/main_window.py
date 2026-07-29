@@ -265,13 +265,21 @@ class MainWindow(QMainWindow):
         return app is None or app.palette().window().color().lightness() < 145
 
     def _apply_theme(self) -> None:
-        """Apply the selected appearance without changing the system palette."""
+        """Apply the selected appearance to every application popup and window."""
 
         if self._preferences.appearance == "system":
             dark = self._system_uses_dark_theme()
         else:
             dark = self._preferences.appearance == "dark"
-        self.setStyleSheet(stylesheet(dark=dark))
+        theme = stylesheet(dark=dark)
+        application = QApplication.instance()
+        if application is not None:
+            # Combo-box lists, menus, and tooltips are separate native windows.
+            # An application-wide sheet keeps them readable when Reelabel's
+            # selected appearance differs from the operating-system theme.
+            application.setStyleSheet(theme)
+        else:
+            self.setStyleSheet(theme)
 
     def _apply_scan_defaults(self) -> None:
         """Copy saved scan defaults into the main-window controls."""
