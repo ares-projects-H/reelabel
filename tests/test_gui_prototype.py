@@ -2,6 +2,7 @@
 
 import importlib.util
 import os
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -15,7 +16,12 @@ if PYSIDE_AVAILABLE:
 
     from reelabel import api
     from reelabel.gui.main_window import DEMO_ROWS, MainWindow
-    from reelabel.gui.settings import SettingsValues, load_settings, save_settings
+    from reelabel.gui.settings import (
+        SettingsDialog,
+        SettingsValues,
+        load_settings,
+        save_settings,
+    )
     from reelabel.gui.styles import stylesheet
 
 
@@ -70,6 +76,41 @@ class GuiPrototypeTests(unittest.TestCase):
     def test_header_dividers_are_visible_in_both_themes(self) -> None:
         self.assertIn("border-right: 1px solid #435476;", stylesheet(dark=True))
         self.assertIn("border-right: 1px solid #b6c3d6;", stylesheet(dark=False))
+
+    def test_popup_controls_have_explicit_colors_in_both_themes(self) -> None:
+        for dark in (False, True):
+            theme = stylesheet(dark=dark)
+            self.assertIn("QComboBox QAbstractItemView {", theme)
+            self.assertIn("selection-color: #07101d;", theme)
+            self.assertIn("QToolTip {", theme)
+            self.assertIn("QScrollBar:vertical, QScrollBar:horizontal {", theme)
+
+    def test_settings_dropdowns_fit_their_complete_labels(self) -> None:
+        dialog = SettingsDialog(SettingsValues())
+        for combo in (dialog.appearance, dialog.media_scope):
+            widest_label = max(
+                combo.fontMetrics().horizontalAdvance(combo.itemText(index))
+                for index in range(combo.count())
+            )
+            control_width = max(160, widest_label + 48)
+            popup_width = max(200, widest_label + 64)
+            self.assertGreaterEqual(combo.minimumWidth(), control_width)
+            self.assertGreaterEqual(combo.view().minimumWidth(), popup_width)
+        dialog.close()
+
+    def test_selected_theme_is_applied_application_wide(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = QSettings(
+                str(Path(directory) / "reelabel-theme-test.ini"),
+                QSettings.Format.IniFormat,
+            )
+            save_settings(store, SettingsValues(appearance="light"))
+            window = MainWindow(demo=False, settings_store=store)
+            self.assertEqual(
+                QApplication.instance().styleSheet(),
+                stylesheet(dark=False),
+            )
+            window.close()
 
     def test_native_application_menu_roles_exist(self) -> None:
         window = MainWindow(demo=False)

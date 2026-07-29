@@ -21,6 +21,12 @@ refuses ambiguous or conflicting operations.
 
 ![Reelabel application preview](docs/screenshots/application-preview.png)
 
+### Fictional series example
+
+All media and folder names in this preview are invented for demonstration:
+
+![Reelabel preview using an invented series](docs/screenshots/series-preview.png)
+
 Reelabel includes:
 
 - folder selection and drag-and-drop;

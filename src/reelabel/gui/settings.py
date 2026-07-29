@@ -10,8 +10,9 @@ from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
     QDialogButtonBox,
-    QFormLayout,
+    QGridLayout,
     QLabel,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -20,6 +21,25 @@ APPEARANCE_KEY = "appearance/theme"
 MEDIA_SCOPE_KEY = "scan/default_media_scope"
 RECURSIVE_KEY = "scan/default_include_subfolders"
 EXTRAS_KEY = "scan/default_include_extras"
+
+
+def _fit_combo_to_items(combo: QComboBox) -> None:
+    """Keep the control compact while showing every popup label in full."""
+
+    if combo.count() == 0:
+        return
+    widest_label = max(
+        combo.fontMetrics().horizontalAdvance(combo.itemText(index))
+        for index in range(combo.count())
+    )
+    # The closed control stays compact in the two-column settings layout. The
+    # popup may be slightly wider so its labels never need an ellipsis.
+    control_width = max(160, widest_label + 48)
+    popup_width = max(200, widest_label + 64)
+    combo.setMinimumWidth(control_width)
+    combo.view().setMinimumWidth(popup_width)
+    combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+    combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
 
 
 @dataclass(frozen=True)
@@ -83,32 +103,40 @@ class SettingsDialog(QDialog):
         page.addWidget(heading)
         page.addWidget(explanation)
 
-        form = QFormLayout()
-        form.setHorizontalSpacing(18)
-        form.setVerticalSpacing(14)
+        choices = QGridLayout()
+        choices.setHorizontalSpacing(12)
+        choices.setVerticalSpacing(6)
+        choices.setColumnStretch(0, 1)
+        choices.setColumnStretch(1, 1)
 
+        appearance_label = QLabel("Appearance")
         self.appearance = QComboBox()
         self.appearance.addItem("System default", "system")
         self.appearance.addItem("Light", "light")
         self.appearance.addItem("Dark", "dark")
         self.appearance.setCurrentIndex(max(0, self.appearance.findData(values.appearance)))
-        form.addRow("Appearance", self.appearance)
+        _fit_combo_to_items(self.appearance)
 
+        media_scope_label = QLabel("Default media type")
         self.media_scope = QComboBox()
         self.media_scope.addItem("All media", "all")
         self.media_scope.addItem("Movies only", "movies")
         self.media_scope.addItem("Series only", "series")
         self.media_scope.setCurrentIndex(max(0, self.media_scope.findData(values.media_scope)))
-        form.addRow("Default media type", self.media_scope)
+        _fit_combo_to_items(self.media_scope)
+        choices.addWidget(appearance_label, 0, 0)
+        choices.addWidget(media_scope_label, 0, 1)
+        choices.addWidget(self.appearance, 1, 0)
+        choices.addWidget(self.media_scope, 1, 1)
+        page.addLayout(choices)
 
         self.recursive = QCheckBox("Include subfolders by default")
         self.recursive.setChecked(values.recursive)
-        form.addRow("", self.recursive)
+        page.addWidget(self.recursive)
 
         self.include_extras = QCheckBox("Include extras by default")
         self.include_extras.setChecked(values.include_extras)
-        form.addRow("", self.include_extras)
-        page.addLayout(form)
+        page.addWidget(self.include_extras)
 
         safety_note = QLabel(
             "Related images and NFO files remain disabled and unchecked by default. "
