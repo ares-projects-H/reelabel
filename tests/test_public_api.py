@@ -12,7 +12,7 @@ import pytest
 from reelabel import api, core
 
 
-def _movie(root: Path, name: str = "Campaign.2007.DVDRip.XviD.AC3.mkv") -> Path:
+def _movie(root: Path, name: str = "Glass Meridian.2007.DVDRip.XviD.AC3.mkv") -> Path:
     path = root / name
     path.touch()
     return path
@@ -32,7 +32,7 @@ def test_windows_reserved_name_is_rejected_on_every_platform(tmp_path: Path) -> 
 
 
 def test_duplicate_destination_is_rejected_case_insensitively(tmp_path: Path) -> None:
-    first = _movie(tmp_path, "Campaign.2007.DVDRip.mkv")
+    first = _movie(tmp_path, "Glass Meridian.2007.DVDRip.mkv")
     second = _movie(tmp_path, "Another.Movie.2008.DVDRip.mkv")
     report = api.scan(api.ScanOptions(tmp_path))
     issues = api.validate_edits(
@@ -114,9 +114,9 @@ def test_related_file_requires_explicit_selection_and_flag(tmp_path: Path) -> No
 
 
 def test_scan_proposes_clean_leaf_folder_name(tmp_path: Path) -> None:
-    release = tmp_path / "Gotham.S04.1080p.x265-ZMNT"
+    release = tmp_path / "Lumen Harbor.S04.1080p.x265-ZMNT"
     release.mkdir()
-    (release / "Gotham.S04E01.1080p.x265-ZMNT.mkv").touch()
+    (release / "Lumen Harbor.S04E01.1080p.x265-ZMNT.mkv").touch()
 
     report = api.scan(api.ScanOptions(tmp_path))
 
@@ -126,15 +126,15 @@ def test_scan_proposes_clean_leaf_folder_name(tmp_path: Path) -> None:
         if rename.kind == "directory"
     )
     assert folder.source == release
-    assert folder.destination.name == "Gotham S04"
+    assert folder.destination.name == "Lumen Harbor S04"
 
 
 def test_file_and_containing_folder_apply_and_undo_together(
     tmp_path: Path,
 ) -> None:
-    release = tmp_path / "Gotham.S04.1080p.x265-ZMNT"
+    release = tmp_path / "Lumen Harbor.S04.1080p.x265-ZMNT"
     release.mkdir()
-    original_file = release / "Gotham.S04E01.1080p.x265-ZMNT.mkv"
+    original_file = release / "Lumen Harbor.S04E01.1080p.x265-ZMNT.mkv"
     original_file.touch()
     report = api.scan(api.ScanOptions(tmp_path))
     selected = {
@@ -149,9 +149,9 @@ def test_file_and_containing_folder_apply_and_undo_together(
         history_dir=tmp_path / ".application-history",
     )
 
-    clean_folder = tmp_path / "Gotham S04"
+    clean_folder = tmp_path / "Lumen Harbor S04"
     assert clean_folder.is_dir()
-    assert (clean_folder / "Gotham S04 E01.mkv").exists()
+    assert (clean_folder / "Lumen Harbor S04 E01.mkv").exists()
     restored = api.undo(
         result.history_entry,
         trusted_history_dir=result.history_entry.parent,
@@ -165,9 +165,9 @@ def test_file_and_containing_folder_apply_and_undo_together(
 def test_folder_move_failure_restores_file_and_folder_names(
     tmp_path: Path,
 ) -> None:
-    release = tmp_path / "Gotham.S04.1080p.x265-ZMNT"
+    release = tmp_path / "Lumen Harbor.S04.1080p.x265-ZMNT"
     release.mkdir()
-    original_file = release / "Gotham.S04E01.1080p.x265-ZMNT.mkv"
+    original_file = release / "Lumen Harbor.S04E01.1080p.x265-ZMNT.mkv"
     original_file.touch()
     report = api.scan(api.ScanOptions(tmp_path))
     selected = {
@@ -175,7 +175,7 @@ def test_folder_move_failure_restores_file_and_folder_names(
         for rename in report.renames
         if rename.status == "proposed"
     }
-    clean_folder = tmp_path / "Gotham S04"
+    clean_folder = tmp_path / "Lumen Harbor S04"
     real_replace = os.replace
     failed_once = False
 
@@ -204,15 +204,15 @@ def test_folder_move_failure_restores_file_and_folder_names(
 def test_manual_folder_name_does_not_require_original_suffix(
     tmp_path: Path,
 ) -> None:
-    release = tmp_path / "Gotham.S04.1080p.x265-ZMNT"
+    release = tmp_path / "Lumen Harbor.S04.1080p.x265-ZMNT"
     release.mkdir()
-    (release / "Gotham.S04E01.1080p.x265-ZMNT.mkv").touch()
+    (release / "Lumen Harbor.S04E01.1080p.x265-ZMNT.mkv").touch()
     report = api.scan(api.ScanOptions(tmp_path))
     folder = next(
         rename for rename in report.renames if rename.kind == "directory"
     )
 
-    issues = api.validate_edits(report, {folder.source: "Gotham Season 4"})
+    issues = api.validate_edits(report, {folder.source: "Lumen Harbor Season 4"})
 
     assert not issues
 
@@ -220,9 +220,9 @@ def test_manual_folder_name_does_not_require_original_suffix(
 def test_selected_release_folder_can_rename_with_local_cli_history(
     tmp_path: Path,
 ) -> None:
-    release = tmp_path / "Gotham.S04.1080p.x265-ZMNT"
+    release = tmp_path / "Lumen Harbor.S04.1080p.x265-ZMNT"
     release.mkdir()
-    original_file = release / "Gotham.S04E01.1080p.x265-ZMNT.mkv"
+    original_file = release / "Lumen Harbor.S04E01.1080p.x265-ZMNT.mkv"
     original_file.touch()
     report = api.scan(api.ScanOptions(release))
     selected = {
@@ -233,7 +233,7 @@ def test_selected_release_folder_can_rename_with_local_cli_history(
 
     result = api.apply(report, selected)
 
-    clean_folder = tmp_path / "Gotham S04"
+    clean_folder = tmp_path / "Lumen Harbor S04"
     assert clean_folder.is_dir()
     assert result.history_entry.parent == clean_folder
     restored = api.undo(
@@ -249,9 +249,9 @@ def test_selected_release_folder_can_rename_with_local_cli_history(
 def test_explicit_sidecar_deletion_follows_renamed_folder(
     tmp_path: Path,
 ) -> None:
-    release = tmp_path / "Gotham.S04.1080p.x265-ZMNT"
+    release = tmp_path / "Lumen Harbor.S04.1080p.x265-ZMNT"
     release.mkdir()
-    (release / "Gotham.S04E01.1080p.x265-ZMNT.mkv").touch()
+    (release / "Lumen Harbor.S04E01.1080p.x265-ZMNT.mkv").touch()
     poster = release / "poster.jpg"
     poster.touch()
     report = api.scan(
@@ -271,7 +271,7 @@ def test_explicit_sidecar_deletion_follows_renamed_folder(
         history_dir=tmp_path / ".application-history",
     )
 
-    clean_folder = tmp_path / "Gotham S04"
+    clean_folder = tmp_path / "Lumen Harbor S04"
     assert clean_folder.is_dir()
     assert not (clean_folder / "poster.jpg").exists()
     restored = api.undo(
@@ -370,5 +370,38 @@ def test_undo_rejects_paths_outside_expected_scope(tmp_path: Path) -> None:
     result = api.undo(record, expected_scope=allowed)
 
     assert result.restored == 0
-    assert any("hors du dossier" in error for error in result.errors)
+    assert any("outside the authorized" in error for error in result.errors)
     assert external.exists()
+
+
+def test_undo_rejects_forged_root_folder_rename(tmp_path: Path) -> None:
+    expected = tmp_path / "expected-media"
+    unrelated = tmp_path / "unrelated"
+    unrelated.mkdir()
+    protected_file = unrelated / "keep.mkv"
+    protected_file.touch()
+    record = tmp_path / "rename_undo_forged_directory.json"
+    record.write_text(
+        json.dumps(
+            {
+                "scope": str(expected),
+                "operations": [
+                    {
+                        "status": "renamed",
+                        "kind": "directory",
+                        "old_path": str(expected),
+                        "new_path": str(unrelated),
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = api.undo(record, expected_scope=expected)
+
+    assert result.restored == 0
+    assert any("invalid root-folder rename" in error for error in result.errors)
+    assert unrelated.is_dir()
+    assert protected_file.exists()
+    assert not expected.exists()

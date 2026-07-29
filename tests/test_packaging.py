@@ -51,10 +51,13 @@ def test_release_workflow_covers_every_public_package() -> None:
         "macOS ${{ matrix.architecture }} DMG",
         "Linux x86_64 AppImage and DEB",
         "SHA-256 checksums",
-        "Reelabel-0.1.0-Windows-x64-Setup.exe",
-        "Reelabel-0.1.0-macOS-${{ matrix.architecture }}.dmg",
-        "Reelabel-0.1.0-Linux-x86_64.AppImage",
-        "Reelabel-0.1.0-Ubuntu-24.04-x86_64.deb",
+        "Read version from pyproject.toml",
+        'test "$GITHUB_REF_NAME" = "v${{ steps.project.outputs.version }}"',
+        "Reelabel-${{ env.VERSION }}-Windows-x64-Setup.exe",
+        "Reelabel-${{ env.VERSION }}-macOS-${{ matrix.architecture }}.dmg",
+        "Reelabel-${{ env.VERSION }}-Linux-x86_64.AppImage",
+        "Reelabel-${{ env.VERSION }}-Ubuntu-24.04-x86_64.deb",
+        '"/DMyAppVersion=$env:VERSION"',
         "REELABEL_SMOKE_TEST_SETTINGS",
         "QT_QPA_PLATFORM=offscreen /usr/bin/reelabel",
         "brew install create-dmg",
@@ -74,3 +77,15 @@ def test_ubuntu_package_contains_desktop_integration_and_license() -> None:
         "/usr/share/doc/reelabel/copyright",
     ):
         assert expected in build_script
+
+
+def test_bundled_codex_skill_uses_the_same_engine_and_public_api() -> None:
+    bundled = PROJECT_ROOT / "reelabel-skill" / "reelabel"
+    assert (bundled / "scripts" / "reelabel" / "core.py").read_bytes() == (
+        PROJECT_ROOT / "src" / "reelabel" / "core.py"
+    ).read_bytes()
+    assert (bundled / "scripts" / "reelabel" / "api.py").read_bytes() == (
+        PROJECT_ROOT / "src" / "reelabel" / "api.py"
+    ).read_bytes()
+    instructions = (bundled / "SKILL.md").read_text(encoding="utf-8")
+    assert '--undo-scope "<original-media-folder>"' in instructions

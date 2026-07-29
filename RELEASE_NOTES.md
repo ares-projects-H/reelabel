@@ -10,6 +10,9 @@ First public release of the offline Reelabel desktop application.
 - Propagate a corrected title or season pattern to other episodes in the same folder.
 - Propagate a corrected movie title to its related subtitle files after confirmation.
 - Restore file and folder names from History / Undo.
+- Require an explicit media-folder scope for command-line Undo and reject
+  inconsistent or out-of-scope history records.
+- Escape terminal control characters in untrusted filenames.
 - Run entirely offline with no analytics or metadata lookups.
 
 ## Downloads

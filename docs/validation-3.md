@@ -1,7 +1,8 @@
 # Validation 3 — Installers and publication
 
-This checkpoint packages Reelabel as a standalone application and
-publishes version 0.1.0 from GitHub Actions.
+This checkpoint packages Reelabel as a standalone application and prepares the
+private version 0.1.0 release candidate with GitHub Actions. Publication,
+tagging, and public repository visibility remain separate owner-approved steps.
 
 ## Deliverables
 
@@ -12,7 +13,7 @@ publishes version 0.1.0 from GitHub Actions.
 - SHA-256 checksums for every download.
 - Automated tests on Windows, macOS, and Linux.
 - Packaged-application startup tests on every build platform.
-- Public GitHub repository and release notes.
+- Private release-candidate artifacts and draft release notes.
 
 ## Application icon
 
@@ -30,9 +31,17 @@ trigger Windows SmartScreen or macOS Gatekeeper. The release provides SHA-256
 checksums and documents the warning instead of bypassing operating-system
 security.
 
-## Validation requested
+## Validation status
 
-Test the package matching your system with a copied media folder:
+The owner has validated the private packages on:
+
+- macOS Apple Silicon;
+- Windows 11 x64;
+- Ubuntu 24.04 x86_64 using the recommended DEB package.
+
+The separate macOS Intel package is built automatically but has not been
+confirmed on Intel hardware. Before public publication, repeat this short final
+check on freshly built packages:
 
 1. Install and start the application without Python or Codex.
 2. Confirm the application logo appears in the Dock, taskbar, or application

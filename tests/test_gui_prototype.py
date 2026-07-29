@@ -134,19 +134,19 @@ class GuiPrototypeTests(unittest.TestCase):
         window = MainWindow(demo=False)
         self.assertEqual(
             window._batch_episode_name(
-                "Gothan S04 E01.mkv",
-                "Gotham S04 E01.mkv",
-                "Gothan S04 E09.ass",
+                "Lumen Harbr S04 E01.mkv",
+                "Lumen Harbor S04 E01.mkv",
+                "Lumen Harbr S04 E09.ass",
             ),
-            "Gotham S04 E09.ass",
+            "Lumen Harbor S04 E09.ass",
         )
         self.assertEqual(
             window._batch_episode_name(
-                "Black S01 E01.mkv",
-                "Black E01.mkv",
-                "Black S01 E10.fr.srt",
+                "Obsidian S01 E01.mkv",
+                "Obsidian E01.mkv",
+                "Obsidian S01 E10.fr.srt",
             ),
-            "Black E10.fr.srt",
+            "Obsidian E10.fr.srt",
         )
         window.close()
 
@@ -193,7 +193,7 @@ if __name__ == "__main__":
 
 @unittest.skipUnless(PYSIDE_AVAILABLE, "PySide6 is not installed")
 def test_real_scan_runs_in_worker_and_enables_safe_apply(qtbot, tmp_path: Path) -> None:
-    (tmp_path / "Campaign.2007.DVDRip.XviD.AC3.mkv").touch()
+    (tmp_path / "Glass Meridian.2007.DVDRip.XviD.AC3.mkv").touch()
     window = MainWindow(demo=False)
     qtbot.addWidget(window)
     window.path_edit.setText(str(tmp_path))
@@ -212,10 +212,10 @@ def test_real_scan_runs_in_worker_and_enables_safe_apply(qtbot, tmp_path: Path) 
 def test_editing_one_episode_can_update_its_folder_group(
     qtbot, tmp_path: Path, monkeypatch
 ) -> None:
-    release = tmp_path / "Gothan.S04.1080p.x265-ZMNT"
+    release = tmp_path / "Lumen Harbr.S04.1080p.x265-ZMNT"
     release.mkdir()
     for episode in (1, 2):
-        (release / f"Gothan.S04E{episode:02d}.1080p.x265-ZMNT.mkv").touch()
+        (release / f"Lumen Harbr.S04E{episode:02d}.1080p.x265-ZMNT.mkv").touch()
     report = api.scan(api.ScanOptions(tmp_path))
     window = MainWindow(demo=False)
     qtbot.addWidget(window)
@@ -228,15 +228,15 @@ def test_editing_one_episode_can_update_its_folder_group(
         for row in range(window.table.rowCount())
         if "E01.mkv" in window.table.item(row, 3).text()
     )
-    edited.setText(edited.text().replace("Gothan", "Gotham"))
+    edited.setText(edited.text().replace("Lumen Harbr", "Lumen Harbor"))
 
     proposals = [
         window.table.item(row, 3).text()
         for row in range(window.table.rowCount())
         if window.table.item(row, 4).text() == "MKV"
     ]
-    assert "Gotham S04 E01.mkv" in proposals
-    assert "Gotham S04 E02.mkv" in proposals
+    assert "Lumen Harbor S04 E01.mkv" in proposals
+    assert "Lumen Harbor S04 E02.mkv" in proposals
 
 
 @unittest.skipUnless(PYSIDE_AVAILABLE, "PySide6 is not installed")

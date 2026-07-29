@@ -9,58 +9,61 @@ import unittest
 from pathlib import Path
 
 from reelabel.core import (
+    Rename,
+    Report,
     build_report,
     normalize_folder_name,
     parse_media_name,
+    print_report,
 )
 
 
 class CoreBehaviorTests(unittest.TestCase):
     def test_release_folder_name_is_cleaned(self) -> None:
         self.assertEqual(
-            normalize_folder_name("Gotham.S04.1080p.x265-ZMNT"),
-            "Gotham S04",
+            normalize_folder_name("Lumen Harbor.S04.1080p.x265-ZMNT"),
+            "Lumen Harbor S04",
         )
 
     def test_movie_release_name_is_cleaned(self) -> None:
-        path = Path("/library/Always.Sunset.on.Third.Street.2005.1080p.BluRay.x264.mkv")
+        path = Path("/library/Evening.Over.Cedar.Street.2005.1080p.BluRay.x264.mkv")
         parsed = parse_media_name(path, Path("/library"))
-        self.assertEqual(parsed.display(), "Always Sunset on Third Street (2005)")
+        self.assertEqual(parsed.display(), "Evening Over Cedar Street (2005)")
 
     def test_ep_release_infers_first_season(self) -> None:
         path = Path(
-            "/library/Toumei na Yurikago 2018 S01 1080p NF WEB-DL/"
-            "Toumei.na.Yurikago.EP01.1080p.NF.WEB-DL.DDP2.0.H.264-MagicStar.mkv"
+            "/library/Moonlit Cradle 2018 S01 1080p NF WEB-DL/"
+            "Moonlit.Cradle.EP01.1080p.NF.WEB-DL.DDP2.0.H.264-ExampleGroup.mkv"
         )
         parsed = parse_media_name(path, Path("/library"))
-        self.assertEqual(parsed.display(), "Toumei na Yurikago S01 E01")
+        self.assertEqual(parsed.display(), "Moonlit Cradle S01 E01")
 
     def test_idx_and_sub_pair_keep_matching_base(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            video = root / "Campaign.2007.DVDRip.XviD.AC3.Glaeken.CG.avi"
-            idx = root / "Campaign.2007.DVDRip.XviD.AC3.Glaeken.CG.idx"
-            sub = root / "Campaign.2007.DVDRip.XviD.AC3.Glaeken.CG.sub"
+            video = root / "Glass Meridian.2007.DVDRip.XviD.AC3.Glaeken.CG.avi"
+            idx = root / "Glass Meridian.2007.DVDRip.XviD.AC3.Glaeken.CG.idx"
+            sub = root / "Glass Meridian.2007.DVDRip.XviD.AC3.Glaeken.CG.sub"
             for path in (video, idx, sub):
                 path.touch()
 
             report = build_report(root)
             targets = {rename.destination.name for rename in report.renames}
-            self.assertIn("Campaign (2007).avi", targets)
-            self.assertIn("Campaign (2007).idx", targets)
-            self.assertIn("Campaign (2007).sub", targets)
+            self.assertIn("Glass Meridian (2007).avi", targets)
+            self.assertIn("Glass Meridian (2007).idx", targets)
+            self.assertIn("Glass Meridian (2007).sub", targets)
 
     def test_related_images_are_not_proposed_by_default(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            (root / "Campaign.2007.DVDRip.XviD.AC3.Glaeken.CG.avi").touch()
+            (root / "Glass Meridian.2007.DVDRip.XviD.AC3.Glaeken.CG.avi").touch()
             (root / "poster.jpg").touch()
             self.assertEqual(build_report(root).deletions, [])
 
     def test_related_images_require_explicit_opt_in(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            (root / "Campaign.2007.DVDRip.XviD.AC3.Glaeken.CG.avi").touch()
+            (root / "Glass Meridian.2007.DVDRip.XviD.AC3.Glaeken.CG.avi").touch()
             poster = root / "poster.jpg"
             poster.touch()
             report = build_report(root, include_sidecars=True)
@@ -88,6 +91,30 @@ class CoreBehaviorTests(unittest.TestCase):
             )
             self.assertEqual(configured_target, "Title (2020).mkv")
             self.assertEqual(unconfigured_target, "Title collector (2020).mkv")
+
+    def test_terminal_report_escapes_control_characters(self) -> None:
+        report = Report(
+            renames=[
+                Rename(
+                    Path("title\x1b]52;c;payload\x07.mkv"),
+                    Path("Title.mkv"),
+                    "test",
+                )
+            ]
+        )
+
+        with unittest.mock.patch("builtins.print") as output:
+            print_report(report, verbose=False)
+
+        rendered = "\n".join(
+            str(argument)
+            for call in output.call_args_list
+            for argument in call.args
+        )
+        self.assertNotIn("\x1b", rendered)
+        self.assertNotIn("\x07", rendered)
+        self.assertIn("\\x1b", rendered)
+        self.assertIn("\\x07", rendered)
 
 
 if __name__ == "__main__":

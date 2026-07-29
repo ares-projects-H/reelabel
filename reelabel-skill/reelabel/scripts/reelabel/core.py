@@ -142,7 +142,7 @@ class Rename:
 @dataclass
 class Deletion:
     path: Path
-    reason: str = "image ou fichier NFO du dossier renommé"
+    reason: str = "related image or NFO file"
     status: str = "proposed"
     detail: str = ""
 
@@ -444,18 +444,20 @@ def load_config(config_path: Path | None) -> dict[str, set[str]]:
     allowed = set(config) | {"language_aliases"}
     unknown = set(data) - allowed
     if unknown or not isinstance(data, dict):
-        raise ValueError(f"Clés de configuration invalides: {', '.join(sorted(unknown)) or 'racine'}")
+        raise ValueError(
+            f"Invalid configuration keys: {', '.join(sorted(unknown)) or 'root'}"
+        )
     for key in ("video_extensions", "subtitle_extensions", "technical_tokens", "extra_tokens"):
         if key in data:
             if not isinstance(data[key], list) or not all(isinstance(x, str) and x.strip() for x in data[key]):
-                raise ValueError(f"{key} doit être une liste de chaînes non vides")
+                raise ValueError(f"{key} must be a list of non-empty strings")
             values = {x.casefold().strip() for x in data[key]}
             if "extensions" in key and not all(x.startswith(".") for x in values):
-                raise ValueError(f"{key} doit contenir des extensions commençant par un point")
+                raise ValueError(f"{key} must contain extensions beginning with a dot")
             config[key].update(values)
     if "language_aliases" in data:
         if not isinstance(data["language_aliases"], dict) or not all(isinstance(k, str) and isinstance(v, str) and v for k, v in data["language_aliases"].items()):
-            raise ValueError("language_aliases doit être un objet chaîne-vers-chaîne")
+            raise ValueError("language_aliases must map strings to strings")
         LANGUAGE_ALIASES.update({k.casefold(): v.casefold() for k, v in data["language_aliases"].items()})
     return config
 
@@ -598,13 +600,15 @@ def _build_report(
     selected_videos: list[MediaFile] = []
     for item in video_items:
         if item.parsed.is_extra and not include_extras:
-            report.ignored.append((item.path, "extra identifié (option --include-extras requise)"))
+            report.ignored.append(
+                (item.path, "identified extra (--include-extras is required)")
+            )
             continue
         if not item.parsed.title:
-            report.ignored.append((item.path, "titre insuffisant ou ambigu"))
+            report.ignored.append((item.path, "title is missing or ambiguous"))
             continue
         if only == "movies" and item.parsed.is_series:
-            report.ignored.append((item.path, "série exclue par --movies"))
+            report.ignored.append((item.path, "series item excluded by --movies"))
             continue
         if only == "series" and not item.parsed.is_series:
             report.ignored.append((item.path, "film exclu par --series"))
@@ -612,7 +616,7 @@ def _build_report(
         selected_videos.append(item)
         target = item.path.with_name(item.parsed.display() + item.path.suffix)
         if target != item.path:
-            report.renames.append(Rename(item.path, target, "nom vidéo normalisé"))
+            report.renames.append(Rename(item.path, target, "normalized video name"))
 
     selected_by_dir: dict[Path, list[MediaFile]] = defaultdict(list)
     for item in selected_videos:
@@ -622,7 +626,7 @@ def _build_report(
     for subtitle in subtitle_items:
         match = _match_subtitle(subtitle, selected_by_dir[subtitle.path.parent])
         if match is None:
-            report.ignored.append((subtitle.path, "sous-titre sans association certaine"))
+            report.ignored.append((subtitle.path, "subtitle has no reliable media match"))
         else:
             matches[subtitle.path] = match
             grouped_subs[match.path].append(subtitle)
@@ -638,7 +642,9 @@ def _build_report(
                 base += "." + ".".join(subtitle.suffixes)
             target = subtitle.path.with_name(base + subtitle.path.suffix)
             if target != subtitle.path:
-                report.renames.append(Rename(subtitle.path, target, "sous-titre associé à la vidéo"))
+                report.renames.append(
+                    Rename(subtitle.path, target, "subtitle matched to media")
+                )
 
     # Matroska files may contain embedded subtitle tracks, so only other
     # containers require an external subtitle.  Report the normalized media
@@ -697,14 +703,20 @@ def _mark_conflicts(report: Report) -> None:
     for same_destination in destinations.values():
         if len(same_destination) > 1:
             for rename in same_destination:
-                rename.status, rename.detail = "conflict", "plusieurs fichiers visent la même destination"
+                rename.status, rename.detail = (
+                    "conflict",
+                    "multiple files target the same destination",
+                )
                 report.conflicts.append((rename.source, rename.detail))
     for rename in active:
         if rename.status != "proposed":
             continue
         sibling_case_collision = any(p.name.casefold() == rename.destination.name.casefold() and p.resolve() not in sources for p in rename.destination.parent.iterdir())
         if rename.destination.exists() and rename.destination.resolve() not in sources or sibling_case_collision:
-            rename.status, rename.detail = "conflict", "destination existante ou collision de casse"
+            rename.status, rename.detail = (
+                "conflict",
+                "destination exists or conflicts by letter case",
+            )
             report.conflicts.append((rename.source, rename.detail))
 
 
@@ -720,14 +732,14 @@ def _rollback_paths(paths: list[tuple[Path, Path]]) -> list[str]:
             os.replace(current, rollback_temp)
             staged.append((rollback_temp, original))
         except OSError as exc:
-            errors.append(f"Impossible de préparer la restauration de {current}: {exc}")
+            errors.append(f"Could not prepare restoration of {current}: {exc}")
     for rollback_temp, original in staged:
         try:
             if original.exists():
-                raise FileExistsError(f"destination de restauration existante: {original}")
+                raise FileExistsError(f"restoration destination already exists: {original}")
             os.replace(rollback_temp, original)
         except OSError as exc:
-            errors.append(f"Impossible de restaurer {original}: {exc}")
+            errors.append(f"Could not restore {original}: {exc}")
     return errors
 
 
@@ -792,7 +804,7 @@ def execute(
     try:
         for rename in safe:
             if not rename.source.exists():
-                raise FileNotFoundError(f"source disparue depuis la planification: {rename.source}")
+                raise FileNotFoundError(f"source disappeared after preview: {rename.source}")
             canonical_source = rename.source.resolve()
             canonical_destination = rename.destination.resolve()
             source_in_root = canonical_source.is_relative_to(root)
@@ -808,17 +820,17 @@ def execute(
                 or (not destination_in_root and not selected_root_folder_move)
             ):
                 raise OSError(
-                    "une opération utilise un lien symbolique ou quitte le dossier sélectionné"
+                    "an operation uses a symbolic link or leaves the selected folder"
                 )
             if rename.kind == "directory" and not rename.source.is_dir():
                 raise NotADirectoryError(
-                    f"le dossier planifié n'est plus un dossier: {rename.source}"
+                    f"the previewed folder is no longer a folder: {rename.source}"
                 )
         for first in directory_renames:
             for second in directory_renames:
                 if first is not second and first.source.is_relative_to(second.source):
                     raise OSError(
-                        "les renommages de dossiers imbriqués ne sont pas autorisés"
+                        "nested folder renames are not allowed"
                     )
 
         # Files are completed while their parent folders still have their
@@ -830,14 +842,16 @@ def execute(
         for deletion in deletions:
             if not deletion.path.exists():
                 deletion.status = "missing"
-                deletion.detail = "fichier disparu depuis la planification"
+                deletion.detail = "file disappeared after preview"
                 continue
             temp = deletion.path.with_name(f".{deletion.path.name}.rename-media-delete-{uuid.uuid4().hex}.tmp")
             os.replace(deletion.path, temp)
             staged_deletions.append((deletion, temp))
         for rename, temp in file_temporary:
             if not _destination_is_free(rename.destination):
-                raise FileExistsError(f"destination apparue depuis la planification: {rename.destination}")
+                raise FileExistsError(
+                    f"destination appeared after preview: {rename.destination}"
+                )
             os.replace(temp, rename.destination)
             finalized_files.add(rename.source)
 
@@ -850,7 +864,7 @@ def execute(
         for rename, temp in directory_temporary:
             if not _destination_is_free(rename.destination):
                 raise FileExistsError(
-                    f"destination apparue depuis la planification: {rename.destination}"
+                    f"destination appeared after preview: {rename.destination}"
                 )
             os.replace(temp, rename.destination)
             finalized_directories.add(rename.source)
@@ -901,7 +915,7 @@ def execute(
         raise OSError(
             f"{exc}"
             + (
-                f"; erreurs de restauration: {'; '.join(rollback_errors)}"
+                f"; restoration errors: {'; '.join(rollback_errors)}"
                 if rollback_errors
                 else ""
             )
@@ -960,7 +974,7 @@ def execute(
                     if not current_original.exists():
                         os.replace(current_temp, current_original)
                 except OSError as restore_exc:
-                    deletion.detail += f"; restauration impossible: {restore_exc}"
+                    deletion.detail += f"; restoration failed: {restore_exc}"
                 deletion_outcomes.append(
                     {
                         "path": str(current_original),
@@ -987,7 +1001,12 @@ def execute(
     return log_path, undo_path
 
 
-def undo(undo_path: Path, scope: Path | None = None) -> tuple[int, list[str]]:
+def undo(
+    undo_path: Path,
+    scope: Path | None = None,
+    *,
+    allow_external_root_move: bool = False,
+) -> tuple[int, list[str]]:
     data = json.loads(undo_path.read_text(encoding="utf-8"))
     entries = [
         item
@@ -995,24 +1014,54 @@ def undo(undo_path: Path, scope: Path | None = None) -> tuple[int, list[str]]:
         if item.get("status") == "renamed"
     ]
     if scope is None:
-        return 0, ["Une annulation exige le dossier média autorisé."]
+        return 0, ["Undo requires an explicitly authorized media folder."]
     resolved_scope = scope.expanduser().resolve()
     allowed_roots = {resolved_scope}
+    root_directory_moves: list[tuple[Path, Path]] = []
     for item in entries:
         if item.get("kind") != "directory":
             continue
-        old_path = Path(item["old_path"]).expanduser().absolute()
-        if old_path == resolved_scope:
-            allowed_roots.add(Path(item["new_path"]).expanduser().resolve())
+        old_path = Path(item["old_path"]).expanduser().resolve()
+        new_path = Path(item["new_path"]).expanduser()
+        resolved_new_path = new_path.resolve()
+        if old_path != resolved_scope:
+            continue
+        root_directory_moves.append((old_path, resolved_new_path))
+        # A legitimate selected-root rename can only move the folder to a
+        # differently named sibling. Requiring this relationship prevents a
+        # forged history file from authorizing an unrelated directory.
+        if (
+            len(root_directory_moves) > 1
+            or resolved_new_path == resolved_scope
+            or resolved_new_path.parent != resolved_scope.parent
+            or new_path.is_symlink()
+            or (
+                not allow_external_root_move
+                and not undo_path.expanduser().resolve().is_relative_to(
+                    resolved_new_path
+                )
+            )
+        ):
+            return 0, ["The history entry contains an invalid root-folder rename."]
+        allowed_roots.add(resolved_new_path)
+    if root_directory_moves and any(
+        item.get("kind") == "directory"
+        and Path(item["old_path"]).expanduser().resolve() != resolved_scope
+        for item in entries
+    ):
+        # Apply never combines a selected-root rename with nested directory
+        # renames. Rejecting that impossible graph keeps Undo's trust boundary
+        # simple and auditable.
+        return 0, ["The history entry contains inconsistent directory renames."]
     for item in entries:
         for path_key in ("old_path", "new_path"):
             candidate = Path(item[path_key]).expanduser().resolve()
             if not any(candidate.is_relative_to(root) for root in allowed_roots):
                 return 0, [
-                    f"Chemin hors du dossier autorisé dans le journal: {candidate}"
+                    f"Path outside the authorized media folder: {candidate}"
                 ]
     if not entries:
-        return 0, [f"Aucune opération d'annulation dans le dossier: {resolved_scope}"]
+        return 0, [f"No undo operations were recorded for: {resolved_scope}"]
 
     directory_operations = [
         (Path(item["new_path"]), Path(item["old_path"]))
@@ -1029,7 +1078,7 @@ def undo(undo_path: Path, scope: Path | None = None) -> tuple[int, list[str]]:
         for source, _ in directory_operations + file_operations
     }
     errors = [
-        f"Conflit: {destination}"
+        f"Conflict: {destination}"
         for source, destination in directory_operations + file_operations
         if not source.exists()
         or (
@@ -1053,7 +1102,9 @@ def undo(undo_path: Path, scope: Path | None = None) -> tuple[int, list[str]]:
             directory_temporary.append((source, temp, destination))
         for source, temp, destination in directory_temporary:
             if not _destination_is_free(destination):
-                raise FileExistsError(f"destination apparue pendant l'annulation: {destination}")
+                raise FileExistsError(
+                    f"destination appeared during Undo: {destination}"
+                )
             os.replace(temp, destination)
             finalized_directories.add(source)
 
@@ -1076,7 +1127,7 @@ def undo(undo_path: Path, scope: Path | None = None) -> tuple[int, list[str]]:
                 destination.exists()
                 and destination.resolve() not in mapped_sources
             ):
-                raise FileExistsError(f"conflit pendant l'annulation: {destination}")
+                raise FileExistsError(f"conflict during Undo: {destination}")
             temp = source.with_name(
                 f".{source.name}.rename-media-undo-{uuid.uuid4().hex}.tmp"
             )
@@ -1085,7 +1136,7 @@ def undo(undo_path: Path, scope: Path | None = None) -> tuple[int, list[str]]:
         for source, temp, destination in file_temporary:
             if not _destination_is_free(destination):
                 raise FileExistsError(
-                    f"destination apparue pendant l'annulation: {destination}"
+                    f"destination appeared during Undo: {destination}"
                 )
             os.replace(temp, destination)
             finalized_files.add(source)
@@ -1113,20 +1164,51 @@ def undo(undo_path: Path, scope: Path | None = None) -> tuple[int, list[str]]:
 
 
 def print_report(report: Report, verbose: bool) -> None:
+    """Print a report without allowing filenames to control the terminal."""
+
     for rename in report.renames:
-        marker = "PROPOSÉ" if rename.status == "proposed" else "CONFLIT"
-        print(f"[{marker}] {rename.source}\n  -> {rename.destination}\n  Raison: {rename.reason}{(': ' + rename.detail) if rename.detail else ''}")
+        marker = "PROPOSED" if rename.status == "proposed" else "CONFLICT"
+        detail = f": {_terminal_safe(rename.detail)}" if rename.detail else ""
+        print(
+            f"[{marker}] {_terminal_safe(rename.source)}\n"
+            f"  -> {_terminal_safe(rename.destination)}\n"
+            f"  Reason: {_terminal_safe(rename.reason)}{detail}"
+        )
     for path, reason in report.ignored:
-        print(f"[IGNORÉ] {path}\n  Raison: {reason}")
+        print(f"[IGNORED] {_terminal_safe(path)}\n  Reason: {_terminal_safe(reason)}")
     for path, media_name in report.missing_subtitles:
-        print(f"[SOUS-TITRES MANQUANTS] {path}\n  Film/épisode: {media_name}\n  Raison: aucun sous-titre externe associé (les fichiers .mkv sont exemptés)")
+        print(
+            f"[MISSING SUBTITLES] {_terminal_safe(path)}\n"
+            f"  Movie/episode: {_terminal_safe(media_name)}\n"
+            "  Reason: no matching external subtitle (.mkv files are exempt)"
+        )
     for deletion in report.deletions:
-        print(f"[SUPPRESSION PROPOSÉE] {deletion.path}\n  Raison: {deletion.reason}")
-    print(f"\nRésumé: {report.videos_found} vidéo(s), {report.subtitles_found} sous-titre(s), "
-          f"{sum(r.status == 'proposed' for r in report.renames)} renommage(s) proposé(s), "
-          f"{len(report.deletions)} suppression(s) proposée(s), {len(report.ignored)} ignoré(s), "
-          f"{len(report.conflicts)} conflit(s)/ambiguïté(s), "
-          f"{len(report.missing_subtitles)} vidéo(s) sans sous-titres.")
+        print(
+            f"[PROPOSED DELETION] {_terminal_safe(deletion.path)}\n"
+            f"  Reason: {_terminal_safe(deletion.reason)}"
+        )
+    print(
+        f"\nSummary: {report.videos_found} video(s), "
+        f"{report.subtitles_found} subtitle(s), "
+        f"{sum(r.status == 'proposed' for r in report.renames)} proposed rename(s), "
+        f"{len(report.deletions)} proposed deletion(s), "
+        f"{len(report.ignored)} ignored, "
+        f"{len(report.conflicts)} conflict(s)/ambiguity item(s), "
+        f"{len(report.missing_subtitles)} video(s) without external subtitles."
+    )
+
+
+def _terminal_safe(value: object) -> str:
+    """Escape terminal control characters found in untrusted filenames."""
+
+    output: list[str] = []
+    for character in str(value):
+        codepoint = ord(character)
+        if codepoint < 0x20 or 0x7F <= codepoint <= 0x9F:
+            output.append(f"\\x{codepoint:02x}")
+        else:
+            output.append(character)
+    return "".join(output)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -1140,13 +1222,33 @@ def main(argv: list[str] | None = None) -> int:
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8", errors="backslashreplace")
-    parser = argparse.ArgumentParser(description="Renomme localement vidéos et sous-titres, sans Internet.")
+    parser = argparse.ArgumentParser(
+        description="Preview and rename local videos and subtitles without Internet access."
+    )
     mode = parser.add_mutually_exclusive_group(required=True)
-    mode.add_argument("--dry-run", action="store_true", help="affiche le plan sans modifier de fichier")
-    mode.add_argument("--apply", action="store_true", help="exécute seulement les renommages sûrs")
-    mode.add_argument("--undo", metavar="FICHIER", help="annule un journal d'annulation")
-    parser.add_argument("--undo-scope", type=Path, metavar="DOSSIER", help="limite --undo aux opérations sous ce dossier")
-    parser.add_argument("path", nargs="?", default=".", help="dossier à analyser (défaut : .)")
+    mode.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="show the plan without changing files",
+    )
+    mode.add_argument(
+        "--apply",
+        action="store_true",
+        help="apply only safe proposed renames",
+    )
+    mode.add_argument("--undo", metavar="FILE", help="restore an Undo history file")
+    parser.add_argument(
+        "--undo-scope",
+        type=Path,
+        metavar="FOLDER",
+        help="authorize --undo only within this exact media folder",
+    )
+    parser.add_argument(
+        "path",
+        nargs="?",
+        default=".",
+        help="folder to scan (default: current folder)",
+    )
     recursion = parser.add_mutually_exclusive_group()
     recursion.add_argument("--recursive", dest="recursive", action="store_true", default=True)
     recursion.add_argument("--no-recursive", dest="recursive", action="store_false")
@@ -1162,27 +1264,24 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--config", type=Path)
     args = parser.parse_args(argv)
     if args.movies and args.series:
-        parser.error("--movies et --series ne peuvent pas être utilisés ensemble")
+        parser.error("--movies and --series cannot be used together")
     if args.undo:
-        if args.undo_scope:
-            count, errors = undo(Path(args.undo), args.undo_scope)
-        else:
-            if args.undo_scope is None:
-                parser.error("--undo exige --undo-scope pour autoriser le dossier restauré")
-            undo_result = public_api.undo(
-                Path(args.undo),
-                expected_scope=args.undo_scope,
-            )
-            count, errors = undo_result.restored, list(undo_result.errors)
-        print(f"Annulation: {count} fichier(s) restauré(s).")
+        if args.undo_scope is None:
+            parser.error("--undo requires --undo-scope to authorize the restored folder")
+        undo_result = public_api.undo(
+            Path(args.undo),
+            expected_scope=args.undo_scope,
+        )
+        count, errors = undo_result.restored, list(undo_result.errors)
+        print(f"Undo: {count} item(s) restored.")
         for error in errors:
-            print(error, file=sys.stderr)
+            print(_terminal_safe(error), file=sys.stderr)
         return 1 if errors else 0
     if args.undo_scope:
-        parser.error("--undo-scope nécessite --undo")
+        parser.error("--undo-scope requires --undo")
     root = Path(args.path)
     if not root.is_dir():
-        parser.error(f"dossier introuvable: {root}")
+        parser.error(f"folder not found: {_terminal_safe(root)}")
     try:
         if args.config:
             # Custom configuration is retained as an advanced legacy CLI
@@ -1248,10 +1347,10 @@ def main(argv: list[str] | None = None) -> int:
                 history_dir=root.resolve(),
             )
         except (OSError, public_api.InvalidEdits) as exc:
-            print(f"Erreur de renommage: {exc}", file=sys.stderr)
+            print(f"Rename error: {_terminal_safe(exc)}", file=sys.stderr)
             return 1
         print(
-            f"Journal: {result.log_path}\n"
-            f"Annulation: {result.history_entry}"
+            f"Log: {_terminal_safe(result.log_path)}\n"
+            f"Undo: {_terminal_safe(result.history_entry)}"
         )
     return 0

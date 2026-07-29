@@ -1,8 +1,8 @@
 # Validation 2 — Working application
 
-This checkpoint connects the approved interface to the local rename engine.
-The source build is ready for controlled testing on copies of real media
-folders. Standalone installers are intentionally deferred to validation 3.
+This completed checkpoint connected the approved interface to the local rename
+engine. It documents the working application behavior that was verified before
+standalone packaging began.
 
 ![Reelabel application preview](screenshots/application-preview.png)
 
@@ -51,8 +51,8 @@ deletion confirmation.
 
 ![Reelabel apply confirmation](screenshots/confirmation-preview.png)
 
-## Current boundary
+## Checkpoint outcome
 
-This is still a source build. It requires Python and PySide6 on the development
-machine. Validation 3 will create standalone packages so end users do not need
-Python or Codex.
+The source application passed this checkpoint. Standalone Windows, macOS, and
+Ubuntu packages were subsequently built and tested without requiring Python or
+Codex on the user's computer; those packages are tracked in validation 3.
