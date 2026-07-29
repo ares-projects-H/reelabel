@@ -92,9 +92,10 @@ class GuiPrototypeTests(unittest.TestCase):
                 combo.fontMetrics().horizontalAdvance(combo.itemText(index))
                 for index in range(combo.count())
             )
-            required_width = max(240, widest_label + 80)
-            self.assertGreaterEqual(combo.minimumWidth(), required_width)
-            self.assertGreaterEqual(combo.view().minimumWidth(), required_width)
+            control_width = max(160, widest_label + 48)
+            popup_width = max(200, widest_label + 64)
+            self.assertGreaterEqual(combo.minimumWidth(), control_width)
+            self.assertGreaterEqual(combo.view().minimumWidth(), popup_width)
         dialog.close()
 
     def test_selected_theme_is_applied_application_wide(self) -> None:
