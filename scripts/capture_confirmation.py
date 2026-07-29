@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -38,6 +39,10 @@ def main() -> int:
             break
 
     window = MainWindow(demo=True)
+    window._preferences = replace(  # noqa: SLF001 - deterministic docs capture
+        window._preferences,
+        show_apply_confirmation=True,
+    )
     window.setStyleSheet(stylesheet(dark=True))
     window.show()
 
@@ -61,13 +66,11 @@ def main() -> int:
     QTimer.singleShot(50, capture_dialog)
     QTimer.singleShot(
         0,
-        lambda: window._confirm_action(
-            "Apply selected changes?",
+        lambda: window._confirm_apply_changes(
             "Rename 22 files and 1 folder?",
             "Reelabel will check every destination again before making "
             "changes. If any rename fails, completed changes are automatically "
             "restored. A History / Undo entry will be saved.",
-            "Rename selected items",
         ),
     )
     application.exec()

@@ -74,17 +74,22 @@ destinations, case collisions, and extension changes.
 ## 4. Apply selected changes
 
 Uncheck any row you do not want to apply. Choose **Apply selected changes**,
-read the confirmation, and approve it only if the counts are correct.
+read the confirmation, and approve it only if the counts are correct. Select
+**Don't show again** if you no longer need this rename reminder.
+You can restore it later with **Show confirmation before applying selected
+changes** in Reelabel Settings.
 
 Reelabel applies a validated group of renames as one operation. If part of the
 operation fails, it restores items already moved instead of leaving a partial
-result. It never overwrites an existing file.
+result. It never overwrites an existing file. These protections remain active
+when the rename confirmation is hidden.
 
 ## 5. Restore names with History / Undo
 
 Every successful operation creates a History / Undo entry in Reelabel's
 application-data folder. Open **History / Undo**, select an available entry,
-and restore it.
+and restore it. **Undo selected** remains disabled until a restorable entry is
+selected.
 
 Undo refuses to overwrite a file that appeared after the original operation.
 
@@ -92,7 +97,7 @@ Undo refuses to overwrite a file that appeared after the original operation.
 
 **Show related images / NFO** is off by default. When enabled, related files
 appear separately and remain unchecked. Deleting selected related files
-requires a second confirmation.
+requires a second confirmation, with **Cancel** as its default action.
 
 ## Application menus and Settings
 
@@ -109,8 +114,9 @@ On Windows and Linux, these commands appear in the Reelabel window's menu bar.
 
 Settings are stored only on the current computer. You can choose System
 default, Light, or Dark appearance and set default media type, subfolder, and
-extras options. Related image/NFO discovery cannot be enabled as a saved
-default.
+extras options. You can also restore the rename confirmation after
+choosing **Don't show again**. Related image/NFO discovery cannot be enabled as
+a saved default, and its permanent-deletion confirmation cannot be disabled.
 
 ## Getting help
 

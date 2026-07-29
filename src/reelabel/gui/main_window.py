@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import re
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QSettings, QStandardPaths, Qt, QThread, Signal, Slot
@@ -527,6 +527,8 @@ class MainWindow(QMainWindow):
             "</ol>"
             "<p><b>History / Undo</b> can restore successful rename operations "
             "without overwriting files.</p>"
+            "<p>If you hide the rename confirmation, restore it in "
+            "<b>Settings</b>. Destination checks and rollback always remain active.</p>"
             "<p>Related images and NFO files stay disabled and unchecked by "
             "default.</p>"
         )
@@ -1075,8 +1077,30 @@ class MainWindow(QMainWindow):
         text: str,
         details: str,
         accept_label: str,
+        destructive: bool = False,
     ) -> bool:
         """Show a high-contrast confirmation using the application logo."""
+
+        message, accept = self._confirmation_dialog(
+            title,
+            text,
+            details,
+            accept_label,
+            accept_is_default=not destructive,
+        )
+        message.exec()
+        return message.clickedButton() is accept
+
+    def _confirmation_dialog(
+        self,
+        title: str,
+        text: str,
+        details: str,
+        accept_label: str,
+        *,
+        accept_is_default: bool = True,
+    ) -> tuple[QMessageBox, QPushButton]:
+        """Build a consistently styled confirmation dialog."""
 
         message = QMessageBox(self)
         message.setWindowTitle(title)
@@ -1098,9 +1122,39 @@ class MainWindow(QMainWindow):
             QMessageBox.ButtonRole.AcceptRole,
         )
         accept.setObjectName("primary")
-        message.setDefaultButton(accept)
+        cancel = message.button(QMessageBox.StandardButton.Cancel)
+        if accept_is_default:
+            message.setDefaultButton(accept)
+        elif cancel is not None:
+            # Pressing Enter must never approve a permanent deletion.
+            message.setDefaultButton(cancel)
+        return message, accept
+
+    def _confirm_apply_changes(self, text: str, details: str) -> bool:
+        """Confirm ordinary renames and optionally remember a user's opt-out."""
+
+        if not self._preferences.show_apply_confirmation:
+            return True
+        message, accept = self._confirmation_dialog(
+            "Apply selected changes?",
+            text,
+            details,
+            "Rename selected items",
+        )
+        dont_show_again = QCheckBox("Don't show again")
+        dont_show_again.setToolTip(
+            "You can restore this confirmation in Reelabel Settings."
+        )
+        message.setCheckBox(dont_show_again)
         message.exec()
-        return message.clickedButton() is accept
+        accepted = message.clickedButton() is accept
+        if accepted and dont_show_again.isChecked():
+            self._preferences = replace(
+                self._preferences,
+                show_apply_confirmation=False,
+            )
+            save_settings(self._settings_store, self._preferences)
+        return accepted
 
     def _selected_edits(self) -> dict[Path, str]:
         edits: dict[Path, str] = {}
@@ -1180,13 +1234,11 @@ class MainWindow(QMainWindow):
             parts.append(f"{file_count} {'file' if file_count == 1 else 'files'}")
         if folder_count:
             parts.append(f"{folder_count} {'folder' if folder_count == 1 else 'folders'}")
-        if not self._confirm_action(
-            "Apply selected changes?",
+        if not self._confirm_apply_changes(
             f"Rename {' and '.join(parts)}?",
             "Reelabel will check every destination again before making changes. "
             "If any rename fails, completed changes are automatically restored. "
             "A History / Undo entry will be saved.",
-            "Rename selected items",
         ):
             return
         if sidecars:
@@ -1196,6 +1248,7 @@ class MainWindow(QMainWindow):
                 "This deletion is permanent and cannot be restored from History / Undo. "
                 "Cancel now if you want to keep these files.",
                 "Delete permanently",
+                True,
             ):
                 return
 
@@ -1267,11 +1320,28 @@ class MainWindow(QMainWindow):
         close = QPushButton("Close")
         undo_button = QPushButton("Undo selected")
         undo_button.setObjectName("primary")
+        undo_button.setEnabled(False)
         buttons.addStretch()
         buttons.addWidget(close)
         buttons.addWidget(undo_button)
         layout.addLayout(buttons)
         close.clicked.connect(dialog.reject)
+
+        if entries.count() == 0:
+            empty = QListWidgetItem("No rename history is available yet.")
+            empty.setFlags(empty.flags() & ~Qt.ItemFlag.ItemIsEnabled)
+            entries.addItem(empty)
+
+        def update_undo_button(current: QListWidgetItem | None) -> None:
+            undo_button.setEnabled(
+                current is not None
+                and bool(current.flags() & Qt.ItemFlag.ItemIsEnabled)
+                and bool(current.data(Qt.ItemDataRole.UserRole))
+            )
+
+        entries.currentItemChanged.connect(
+            lambda current, previous: update_undo_button(current)
+        )
 
         def restore_selected() -> None:
             item = entries.currentItem()

@@ -21,6 +21,7 @@ APPEARANCE_KEY = "appearance/theme"
 MEDIA_SCOPE_KEY = "scan/default_media_scope"
 RECURSIVE_KEY = "scan/default_include_subfolders"
 EXTRAS_KEY = "scan/default_include_extras"
+APPLY_CONFIRMATION_KEY = "confirmations/show_before_apply"
 
 
 def _fit_combo_to_items(combo: QComboBox) -> None:
@@ -50,6 +51,7 @@ class SettingsValues:
     media_scope: str = "all"
     recursive: bool = True
     include_extras: bool = False
+    show_apply_confirmation: bool = True
 
 
 def load_settings(store: QSettings) -> SettingsValues:
@@ -66,6 +68,11 @@ def load_settings(store: QSettings) -> SettingsValues:
         media_scope=media_scope,
         recursive=store.value(RECURSIVE_KEY, True, type=bool),
         include_extras=store.value(EXTRAS_KEY, False, type=bool),
+        show_apply_confirmation=store.value(
+            APPLY_CONFIRMATION_KEY,
+            True,
+            type=bool,
+        ),
     )
 
 
@@ -76,6 +83,7 @@ def save_settings(store: QSettings, values: SettingsValues) -> None:
     store.setValue(MEDIA_SCOPE_KEY, values.media_scope)
     store.setValue(RECURSIVE_KEY, values.recursive)
     store.setValue(EXTRAS_KEY, values.include_extras)
+    store.setValue(APPLY_CONFIRMATION_KEY, values.show_apply_confirmation)
     store.sync()
 
 
@@ -103,6 +111,12 @@ class SettingsDialog(QDialog):
         page.addWidget(heading)
         page.addWidget(explanation)
 
+        scan_heading = QLabel("Scan defaults")
+        scan_heading.setObjectName("sectionTitle")
+        page.addWidget(scan_heading)
+
+        scan_defaults = QVBoxLayout()
+        scan_defaults.setSpacing(8)
         choices = QGridLayout()
         choices.setHorizontalSpacing(12)
         choices.setVerticalSpacing(6)
@@ -128,19 +142,44 @@ class SettingsDialog(QDialog):
         choices.addWidget(media_scope_label, 0, 1)
         choices.addWidget(self.appearance, 1, 0)
         choices.addWidget(self.media_scope, 1, 1)
-        page.addLayout(choices)
+        scan_defaults.addLayout(choices)
 
         self.recursive = QCheckBox("Include subfolders by default")
         self.recursive.setChecked(values.recursive)
-        page.addWidget(self.recursive)
+        scan_defaults.addWidget(self.recursive)
 
         self.include_extras = QCheckBox("Include extras by default")
         self.include_extras.setChecked(values.include_extras)
-        page.addWidget(self.include_extras)
+        scan_defaults.addWidget(self.include_extras)
+        page.addLayout(scan_defaults)
+
+        confirmation_heading = QLabel("Confirmations")
+        confirmation_heading.setObjectName("sectionTitle")
+        page.addWidget(confirmation_heading)
+
+        confirmation_options = QVBoxLayout()
+        confirmation_options.setSpacing(4)
+        self.apply_confirmation = QCheckBox(
+            "Show confirmation before applying selected changes"
+        )
+        self.apply_confirmation.setChecked(values.show_apply_confirmation)
+        self.apply_confirmation.setToolTip(
+            "Re-enable this after choosing Don't show again in the Apply dialog."
+        )
+        confirmation_hint = QLabel(
+            "Destination checks, automatic restoration, and History / Undo "
+            "remain active even when this confirmation is hidden."
+        )
+        confirmation_hint.setObjectName("muted")
+        confirmation_hint.setWordWrap(True)
+        confirmation_options.addWidget(self.apply_confirmation)
+        confirmation_options.addWidget(confirmation_hint)
+        page.addLayout(confirmation_options)
 
         safety_note = QLabel(
-            "Related images and NFO files remain disabled and unchecked by default. "
-            "This safety control cannot be changed here."
+            "Related images and NFO files remain disabled and unchecked by "
+            "default. Their separate permanent-deletion confirmation cannot "
+            "be disabled."
         )
         safety_note.setObjectName("safeNotice")
         safety_note.setWordWrap(True)
@@ -165,4 +204,5 @@ class SettingsDialog(QDialog):
             media_scope=str(self.media_scope.currentData()),
             recursive=self.recursive.isChecked(),
             include_extras=self.include_extras.isChecked(),
+            show_apply_confirmation=self.apply_confirmation.isChecked(),
         )
