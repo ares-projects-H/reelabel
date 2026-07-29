@@ -22,6 +22,24 @@ RECURSIVE_KEY = "scan/default_include_subfolders"
 EXTRAS_KEY = "scan/default_include_extras"
 
 
+def _fit_combo_to_items(combo: QComboBox) -> None:
+    """Keep every popup label visible with the current platform font."""
+
+    if combo.count() == 0:
+        return
+    widest_label = max(
+        combo.fontMetrics().horizontalAdvance(combo.itemText(index))
+        for index in range(combo.count())
+    )
+    # Leave room for the popup margins, the selected-item marker, and the
+    # combo-box arrow. Fixed character counts are unreliable across macOS,
+    # Windows, Linux, display scaling, and user-selected system fonts.
+    required_width = max(240, widest_label + 80)
+    combo.setMinimumWidth(required_width)
+    combo.view().setMinimumWidth(required_width)
+    combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+
+
 @dataclass(frozen=True)
 class SettingsValues:
     """Validated preferences used by the interface."""
@@ -92,6 +110,7 @@ class SettingsDialog(QDialog):
         self.appearance.addItem("Light", "light")
         self.appearance.addItem("Dark", "dark")
         self.appearance.setCurrentIndex(max(0, self.appearance.findData(values.appearance)))
+        _fit_combo_to_items(self.appearance)
         form.addRow("Appearance", self.appearance)
 
         self.media_scope = QComboBox()
@@ -99,6 +118,7 @@ class SettingsDialog(QDialog):
         self.media_scope.addItem("Movies only", "movies")
         self.media_scope.addItem("Series only", "series")
         self.media_scope.setCurrentIndex(max(0, self.media_scope.findData(values.media_scope)))
+        _fit_combo_to_items(self.media_scope)
         form.addRow("Default media type", self.media_scope)
 
         self.recursive = QCheckBox("Include subfolders by default")

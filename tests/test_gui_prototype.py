@@ -16,7 +16,12 @@ if PYSIDE_AVAILABLE:
 
     from reelabel import api
     from reelabel.gui.main_window import DEMO_ROWS, MainWindow
-    from reelabel.gui.settings import SettingsValues, load_settings, save_settings
+    from reelabel.gui.settings import (
+        SettingsDialog,
+        SettingsValues,
+        load_settings,
+        save_settings,
+    )
     from reelabel.gui.styles import stylesheet
 
 
@@ -79,6 +84,18 @@ class GuiPrototypeTests(unittest.TestCase):
             self.assertIn("selection-color: #07101d;", theme)
             self.assertIn("QToolTip {", theme)
             self.assertIn("QScrollBar:vertical, QScrollBar:horizontal {", theme)
+
+    def test_settings_dropdowns_fit_their_complete_labels(self) -> None:
+        dialog = SettingsDialog(SettingsValues())
+        for combo in (dialog.appearance, dialog.media_scope):
+            widest_label = max(
+                combo.fontMetrics().horizontalAdvance(combo.itemText(index))
+                for index in range(combo.count())
+            )
+            required_width = max(240, widest_label + 80)
+            self.assertGreaterEqual(combo.minimumWidth(), required_width)
+            self.assertGreaterEqual(combo.view().minimumWidth(), required_width)
+        dialog.close()
 
     def test_selected_theme_is_applied_application_wide(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
