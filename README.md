@@ -14,8 +14,8 @@ movie, series, and subtitle files, as well as their containing release folders.
 It always previews proposed changes first, preserves media contents, and
 refuses ambiguous or conflicting operations.
 
-> Current milestone: private installer testing before publication. Version
-> 0.1.0 is unsigned, so begin with a copied test folder.
+> Current milestone: private release-candidate preparation before publication.
+> Version 0.1.0 is unsigned, so begin with a copied test folder.
 
 ## Interface preview
 
@@ -116,11 +116,14 @@ terminal:
 ```bash
 reelabel --dry-run "/path/to/media"
 reelabel --apply "/path/to/media"
-reelabel --undo "/path/to/rename_undo_TIMESTAMP.json"
+reelabel --undo "/path/to/rename_undo_TIMESTAMP.json" \
+  --undo-scope "/path/to/original-media-folder"
 ```
 
 Related images and NFO files are never proposed unless
 `--delete-sidecars` is passed explicitly.
+`--undo-scope` is required so a history file cannot restore anything outside
+the media folder you explicitly authorize.
 
 ## Safety principles
 

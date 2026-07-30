@@ -9,15 +9,35 @@ on:
 permissions:
   contents: read
 
-env:
-  VERSION: "0.1.0"
-  PYINSTALLER_CONFIG_DIR: ${{ github.workspace }}/build/pyinstaller-config
-  APPIMAGETOOL_SHA256: "b90f4a8b18967545fda78a445b27680a1642f1ef9488ced28b65398f2be7add2"
-
 jobs:
+  metadata:
+    name: Validate project version
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.project.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - id: project
+        name: Read version from pyproject.toml
+        run: |
+          VERSION="$(python3 -c 'import pathlib, tomllib; print(tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["version"])')"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Require a matching release tag
+        if: startsWith(github.ref, 'refs/tags/')
+        run: test "$GITHUB_REF_NAME" = "v${{ steps.project.outputs.version }}"
+
   windows:
     name: Windows 10/11 x64 EXE
+    needs: metadata
     runs-on: windows-2025
+    env:
+      VERSION: ${{ needs.metadata.outputs.version }}
+      PYINSTALLER_CONFIG_DIR: ${{ github.workspace }}/build/pyinstaller-config
 
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -50,17 +70,21 @@ jobs:
       - name: Build installer
         shell: pwsh
         run: |
-          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "packaging\windows\Reelabel.iss"
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$env:VERSION" "packaging\windows\Reelabel.iss"
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: windows-x64
-          path: release/Reelabel-0.1.0-Windows-x64-Setup.exe
+          path: release/Reelabel-${{ env.VERSION }}-Windows-x64-Setup.exe
           if-no-files-found: error
 
   macos:
     name: macOS ${{ matrix.architecture }} DMG
+    needs: metadata
     runs-on: ${{ matrix.runner }}
+    env:
+      VERSION: ${{ needs.metadata.outputs.version }}
+      PYINSTALLER_CONFIG_DIR: ${{ github.workspace }}/build/pyinstaller-config
     strategy:
       fail-fast: false
       matrix:
@@ -100,12 +124,17 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: macos-${{ matrix.architecture }}
-          path: release/Reelabel-0.1.0-macOS-${{ matrix.architecture }}.dmg
+          path: release/Reelabel-${{ env.VERSION }}-macOS-${{ matrix.architecture }}.dmg
           if-no-files-found: error
 
   linux:
     name: Linux x86_64 AppImage and DEB
+    needs: metadata
     runs-on: ubuntu-24.04
+    env:
+      VERSION: ${{ needs.metadata.outputs.version }}
+      PYINSTALLER_CONFIG_DIR: ${{ github.workspace }}/build/pyinstaller-config
+      APPIMAGETOOL_SHA256: "b90f4a8b18967545fda78a445b27680a1642f1ef9488ced28b65398f2be7add2"
 
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -153,13 +182,13 @@ jobs:
         run: |
           REELABEL_SMOKE_TEST=1 REELABEL_SMOKE_TEST_SETTINGS=1 \
             QT_QPA_PLATFORM=offscreen \
-            release/Reelabel-0.1.0-Linux-x86_64.AppImage \
+            "release/Reelabel-$VERSION-Linux-x86_64.AppImage" \
             --appimage-extract-and-run
 
       - name: Install and smoke-test Ubuntu package
         run: |
           sudo apt-get install --yes \
-            ./release/Reelabel-0.1.0-Ubuntu-24.04-x86_64.deb
+            "./release/Reelabel-$VERSION-Ubuntu-24.04-x86_64.deb"
           REELABEL_SMOKE_TEST=1 REELABEL_SMOKE_TEST_SETTINGS=1 \
             QT_QPA_PLATFORM=offscreen /usr/bin/reelabel
 
@@ -167,14 +196,14 @@ jobs:
         with:
           name: linux-x86_64
           path: |
-            release/Reelabel-0.1.0-Linux-x86_64.AppImage
-            release/Reelabel-0.1.0-Ubuntu-24.04-x86_64.deb
+            release/Reelabel-${{ env.VERSION }}-Linux-x86_64.AppImage
+            release/Reelabel-${{ env.VERSION }}-Ubuntu-24.04-x86_64.deb
           if-no-files-found: error
 
   release:
     name: Publish GitHub release
     if: startsWith(github.ref, 'refs/tags/')
-    needs: [windows, macos, linux]
+    needs: [metadata, windows, macos, linux]
     runs-on: ubuntu-24.04
     permissions:
       contents: write

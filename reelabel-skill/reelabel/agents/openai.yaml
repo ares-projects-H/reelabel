@@ -1,4 +1,4 @@
 interface:
   display_name: "Reelabel"
-  short_description: "Renommer vidéos et sous-titres localement"
+  short_description: "Rename local videos and subtitles safely"
   default_prompt: "Use $reelabel to safely preview renaming a media folder."

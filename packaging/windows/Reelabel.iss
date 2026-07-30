@@ -1,7 +1,9 @@
 ; Inno Setup definition for the unsigned Windows 10/11 x64 installer.
 
 #define MyAppName "Reelabel"
+#ifndef MyAppVersion
 #define MyAppVersion "0.1.0"
+#endif
 #define MyAppPublisher "ares-projects-H"
 #define MyAppExeName "Reelabel.exe"
 
