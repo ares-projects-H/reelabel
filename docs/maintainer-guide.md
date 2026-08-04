@@ -41,19 +41,21 @@ using the official GitHub Actions workflow.
 Fork pull requests should not receive repository secrets. Avoid workflow
 designs that run unreviewed fork code with elevated repository permissions.
 
-## Before making the repository public
+## Repository protections
 
-In **Settings → Security → Advanced Security**, enable the free protections
-available to public repositories:
+Keep the free protections for this public repository enabled:
 
 - Dependabot alerts;
 - secret scanning and push protection;
-- code scanning when its configuration is ready;
 - private vulnerability reporting.
 
-In **Settings → Rules**, protect `main` so changes require a pull request and
-passing checks. Keep the repository private until the owner is ready to enable
-and verify these public-repository protections.
+Protect `main` so normal changes require a pull request and the Windows, macOS,
+and Ubuntu checks. The repository owner may retain a documented emergency
+bypass, but routine changes must use the pull-request workflow.
+
+The empty `release-signing` environment reserves a protected boundary for
+future signing credentials. Do not add a certificate or subscription until the
+owner explicitly approves the relevant signing plan.
 
 ## Official releases
 
@@ -66,9 +68,17 @@ Before publishing:
 1. Confirm all platform jobs passed.
 2. Download and test the installers on copied media folders.
 3. Verify SHA-256 checksums.
-4. Review release notes and installation instructions.
-5. Publish only the files produced by the successful workflow.
+4. Verify each installer's GitHub attestation with:
+
+   ```bash
+   gh attestation verify PATH/TO/INSTALLER \
+     --repo ares-projects-H/reelabel
+   ```
+
+5. Review release notes and installation instructions.
+6. Publish only the files produced by the successful workflow.
 
 Unsigned installers can trigger operating-system warnings. Do not suggest
 disabling system security; explain verification and the normal one-time
-approval instead.
+approval instead. Follow the [signing roadmap](signing-roadmap.md) before
+introducing any certificate or signing secret.

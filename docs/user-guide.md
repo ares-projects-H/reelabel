@@ -1,7 +1,7 @@
 # First-time user guide
 
-Reelabel works locally on your computer. It does not upload filenames, search
-online metadata, modify media contents, or use analytics.
+Reelabel's media workflow runs locally on your computer. It does not upload
+filenames, search online metadata, modify media contents, or use analytics.
 
 For your first test, use a copied media folder rather than your only copy.
 
@@ -12,7 +12,8 @@ screen. **About Reelabel** and **Quit Reelabel** are in the same application
 menu.
 
 On Windows and Linux, open **File → Settings…** in the Reelabel window.
-**About Reelabel** and the offline user guide are under **Help**.
+**About Reelabel**, **Check for Updates…**, and the offline user guide are under
+**Help**.
 
 Settings can remember:
 
@@ -24,6 +25,8 @@ Settings can remember:
 Settings are stored only on the current computer. Related images and NFO files
 cannot be enabled by default and remain a deliberate choice for every session.
 Reelabel does not check for updates or access the network in the background.
+The Settings screen includes the installed version and a **Check for updates**
+button. GitHub is contacted only after you click that button.
 
 ## 1. Choose a folder
 
@@ -109,6 +112,8 @@ screen:
 - **Reelabel → Quit Reelabel** safely closes the application.
 - **File** contains Choose Folder, Preview Changes, and History / Undo.
 - **Help → Reelabel User Guide** opens a concise offline guide.
+- **Help → Check for Updates…** performs one manual check against the official
+  GitHub release. It never downloads or installs anything automatically.
 
 On Windows and Linux, these commands appear in the Reelabel window's menu bar.
 
@@ -117,6 +122,18 @@ default, Light, or Dark appearance and set default media type, subfolder, and
 extras options. You can also restore the rename confirmation after
 choosing **Don't show again**. Related image/NFO discovery cannot be enabled as
 a saved default, and its permanent-deletion confirmation cannot be disabled.
+
+## Check for updates
+
+Choose **Help → Check for Updates…**, or use the button in Settings. Reelabel
+will show whether a newer public release is available. If one is available,
+**Open download page** opens the verified official GitHub release in your
+default browser.
+
+This is Reelabel's only optional network operation. It sends the installed
+version but no filenames, media paths, settings, or history. A failed check does
+not affect scanning or renaming, which remain fully available offline. See
+[PRIVACY.md](../PRIVACY.md) for details.
 
 ## Getting help
 

@@ -13,15 +13,27 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 def test_public_version_is_consistent() -> None:
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["version"] == "0.1.0"
+    assert project["project"]["dynamic"] == ["version"]
+    assert project["tool"]["setuptools"]["dynamic"]["version"] == {
+        "attr": "reelabel._version.__version__"
+    }
     assert project["project"]["name"] == "reelabel"
     assert project["project"]["license"] == "MIT"
     assert "reelabel" in project["project"]["scripts"]
     assert "reelabel-gui" in project["project"]["scripts"]
-    assert reelabel.__version__ == "0.1.0"
-    assert '#define MyAppVersion "0.1.0"' in (
+    assert reelabel.__version__ == "0.2.0"
+    assert f"# Reelabel v{reelabel.__version__}" in (
+        PROJECT_ROOT / "RELEASE_NOTES.md"
+    ).read_text(encoding="utf-8")
+    assert "#error MyAppVersion must be provided" in (
         PROJECT_ROOT / "packaging" / "windows" / "Reelabel.iss"
     ).read_text(encoding="utf-8")
+    for script in (
+        PROJECT_ROOT / "packaging" / "macos" / "build_dmg.sh",
+        PROJECT_ROOT / "packaging" / "linux" / "build_appimage.sh",
+        PROJECT_ROOT / "packaging" / "linux" / "build_deb.sh",
+    ):
+        assert 'VERSION="${1:-0.1.0}"' not in script.read_text(encoding="utf-8")
 
 
 def test_native_icons_have_expected_headers() -> None:
@@ -51,7 +63,8 @@ def test_release_workflow_covers_every_public_package() -> None:
         "macOS ${{ matrix.architecture }} DMG",
         "Linux x86_64 AppImage and DEB",
         "SHA-256 checksums",
-        "Read version from pyproject.toml",
+        "Read project version",
+        'runpy.run_path("src/reelabel/_version.py")',
         'test "$GITHUB_REF_NAME" = "v${{ steps.project.outputs.version }}"',
         "Reelabel-${{ env.VERSION }}-Windows-x64-Setup.exe",
         "Reelabel-${{ env.VERSION }}-macOS-${{ matrix.architecture }}.dmg",
@@ -61,6 +74,11 @@ def test_release_workflow_covers_every_public_package() -> None:
         "REELABEL_SMOKE_TEST_SETTINGS",
         "QT_QPA_PLATFORM=offscreen /usr/bin/reelabel",
         "brew install create-dmg",
+        "Attest installer provenance",
+        "Attest DMG provenance",
+        "Attest Linux package provenance",
+        "actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6",
+        "attestations: write",
     ):
         assert expected in workflow
 

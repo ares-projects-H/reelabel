@@ -1,7 +1,8 @@
 # Installation
 
-Reelabel works entirely offline after installation. It does not require
-Python, Codex, an account, or a metadata service.
+Reelabel's scan and rename workflow works entirely offline after installation.
+It does not require Python, Codex, an account, or a metadata service. Its only
+optional connection is a manual GitHub update check started by the user.
 
 ## Verify a download
 
@@ -25,6 +26,18 @@ On Linux:
 ```bash
 sha256sum Reelabel-0.1.0-Linux-x86_64.AppImage
 ```
+
+Starting with v0.2.0, every installer also has GitHub build provenance. If the
+GitHub CLI is installed, verify a downloaded file with:
+
+```bash
+gh attestation verify PATH/TO/REELABEL-INSTALLER \
+  --repo ares-projects-H/reelabel
+```
+
+The attestation confirms which repository and workflow produced the exact
+file. It does not replace the operating system's application signature or the
+SHA-256 checksum.
 
 ## Windows 10/11 x64
 
