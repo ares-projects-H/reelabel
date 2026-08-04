@@ -14,8 +14,8 @@ movie, series, and subtitle files, as well as their containing release folders.
 It always previews proposed changes first, preserves media contents, and
 refuses ambiguous or conflicting operations.
 
-> Current milestone: private release-candidate preparation before publication.
-> Version 0.1.0 is unsigned, so begin with a copied test folder.
+> Current release: v0.1.0.
+> The installers are unsigned, so begin with a copied test folder.
 
 ## Interface preview
 
