@@ -1,6 +1,6 @@
-# Reelabel v0.1.0
+# Reelabel v0.2.0
 
-First public release of the offline Reelabel desktop application.
+Second feature release of the privacy-focused Reelabel desktop application.
 
 ## Highlights
 
@@ -13,16 +13,23 @@ First public release of the offline Reelabel desktop application.
 - Require an explicit media-folder scope for command-line Undo and reject
   inconsistent or out-of-scope history records.
 - Escape terminal control characters in untrusted filenames.
-- Run entirely offline with no analytics or metadata lookups.
+- Check for a newer official GitHub release only after an explicit click in
+  Help or Settings, without downloading or installing anything automatically.
+- Keep scans, previews, renames, History / Undo, and command-line operations
+  fully offline with no analytics, telemetry, or metadata lookups.
+- Use one application-version source across the interface and every installer.
+- Publish GitHub build-provenance attestations alongside SHA-256 checksums.
+- Document the privacy boundary, security invariants, and future publisher
+  signing roadmap.
 
 ## Downloads
 
-- **Windows 10/11 x64:** `Reelabel-0.1.0-Windows-x64-Setup.exe`
-- **macOS Apple Silicon:** `Reelabel-0.1.0-macOS-arm64.dmg`
-- **macOS Intel:** `Reelabel-0.1.0-macOS-x86_64.dmg`
-- **Ubuntu 24.04 x86_64:** `Reelabel-0.1.0-Ubuntu-24.04-x86_64.deb`
-- **Other Linux x86_64:** `Reelabel-0.1.0-Linux-x86_64.AppImage`
+- **Windows 10/11 x64:** `Reelabel-0.2.0-Windows-x64-Setup.exe`
+- **macOS Apple Silicon:** `Reelabel-0.2.0-macOS-arm64.dmg`
+- **macOS Intel:** `Reelabel-0.2.0-macOS-x86_64.dmg`
+- **Ubuntu 24.04 x86_64:** `Reelabel-0.2.0-Ubuntu-24.04-x86_64.deb`
+- **Other Linux x86_64:** `Reelabel-0.2.0-Linux-x86_64.AppImage`
 
-These first installers are unsigned. Windows SmartScreen or macOS Gatekeeper
+These installers remain unsigned. Windows SmartScreen or macOS Gatekeeper
 may show a warning. Verify the matching SHA-256 value in `SHA256SUMS.txt`
-before opening a download.
+and the GitHub attestation before opening a download.

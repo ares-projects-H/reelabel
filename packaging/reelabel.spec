@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import sys
-import tomllib
+import runpy
 from pathlib import Path
 
 PROJECT_ROOT = Path(SPECPATH).parent
-PROJECT_DATA = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-VERSION = PROJECT_DATA["project"]["version"]
+VERSION = runpy.run_path(PROJECT_ROOT / "src" / "reelabel" / "_version.py")[
+    "__version__"
+]
 ASSETS = PROJECT_ROOT / "assets"
 
 if sys.platform == "darwin":

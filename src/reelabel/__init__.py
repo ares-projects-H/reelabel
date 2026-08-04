@@ -1,5 +1,6 @@
 """Safe, local-only media filename normalization."""
 
+from ._version import __version__
 from .api import (
     ApplyResult,
     InvalidEdits,
@@ -14,8 +15,6 @@ from .api import (
     validate_edits,
 )
 
-__version__ = "0.1.0"
-
 __all__ = [
     "ApplyResult",
     "InvalidEdits",
@@ -28,4 +27,5 @@ __all__ = [
     "scan",
     "undo",
     "validate_edits",
+    "__version__",
 ]

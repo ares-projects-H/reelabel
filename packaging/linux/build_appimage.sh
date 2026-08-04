@@ -3,7 +3,12 @@
 
 set -eu
 
-VERSION="${1:-0.1.0}"
+if [ "$#" -lt 1 ]; then
+    echo "Usage: $0 VERSION APPIMAGETOOL" >&2
+    exit 2
+fi
+
+VERSION="$1"
 APPIMAGETOOL="${2:-appimagetool-x86_64.AppImage}"
 PROJECT_ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 APPDIR="$PROJECT_ROOT/build/Reelabel.AppDir"

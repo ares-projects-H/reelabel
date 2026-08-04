@@ -22,9 +22,9 @@ jobs:
           persist-credentials: false
 
       - id: project
-        name: Read version from pyproject.toml
+        name: Read project version
         run: |
-          VERSION="$(python3 -c 'import pathlib, tomllib; print(tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["version"])')"
+          VERSION="$(python3 -c 'import runpy; print(runpy.run_path("src/reelabel/_version.py")["__version__"])')"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Require a matching release tag
@@ -38,6 +38,10 @@ jobs:
     env:
       VERSION: ${{ needs.metadata.outputs.version }}
       PYINSTALLER_CONFIG_DIR: ${{ github.workspace }}/build/pyinstaller-config
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
 
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -72,6 +76,11 @@ jobs:
         run: |
           & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$env:VERSION" "packaging\windows\Reelabel.iss"
 
+      - name: Attest installer provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: release/Reelabel-${{ env.VERSION }}-Windows-x64-Setup.exe
+
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: windows-x64
@@ -85,6 +94,10 @@ jobs:
     env:
       VERSION: ${{ needs.metadata.outputs.version }}
       PYINSTALLER_CONFIG_DIR: ${{ github.workspace }}/build/pyinstaller-config
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     strategy:
       fail-fast: false
       matrix:
@@ -121,6 +134,11 @@ jobs:
       - name: Build DMG
         run: packaging/macos/build_dmg.sh "$VERSION" "${{ matrix.architecture }}"
 
+      - name: Attest DMG provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: release/Reelabel-${{ env.VERSION }}-macOS-${{ matrix.architecture }}.dmg
+
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: macos-${{ matrix.architecture }}
@@ -135,6 +153,10 @@ jobs:
       VERSION: ${{ needs.metadata.outputs.version }}
       PYINSTALLER_CONFIG_DIR: ${{ github.workspace }}/build/pyinstaller-config
       APPIMAGETOOL_SHA256: "b90f4a8b18967545fda78a445b27680a1642f1ef9488ced28b65398f2be7add2"
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
 
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -191,6 +213,13 @@ jobs:
             "./release/Reelabel-$VERSION-Ubuntu-24.04-x86_64.deb"
           REELABEL_SMOKE_TEST=1 REELABEL_SMOKE_TEST_SETTINGS=1 \
             QT_QPA_PLATFORM=offscreen /usr/bin/reelabel
+
+      - name: Attest Linux package provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: |
+            release/Reelabel-${{ env.VERSION }}-Linux-x86_64.AppImage
+            release/Reelabel-${{ env.VERSION }}-Ubuntu-24.04-x86_64.deb
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:

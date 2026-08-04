@@ -2,7 +2,7 @@
 
 #define MyAppName "Reelabel"
 #ifndef MyAppVersion
-#define MyAppVersion "0.1.0"
+#error MyAppVersion must be provided by the build command
 #endif
 #define MyAppPublisher "ares-projects-H"
 #define MyAppExeName "Reelabel.exe"

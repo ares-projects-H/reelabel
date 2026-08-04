@@ -3,7 +3,12 @@
 
 set -eu
 
-VERSION="${1:-0.1.0}"
+if [ "$#" -lt 1 ]; then
+    echo "Usage: $0 VERSION" >&2
+    exit 2
+fi
+
+VERSION="$1"
 PROJECT_ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 PACKAGE_ROOT="$PROJECT_ROOT/build/reelabel-deb"
 OUTPUT_DIR="$PROJECT_ROOT/release"

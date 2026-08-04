@@ -4,18 +4,22 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from PySide6.QtCore import QSettings
+from PySide6.QtCore import QSettings, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
     QGridLayout,
+    QHBoxLayout,
     QLabel,
+    QPushButton,
     QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
+
+from reelabel._version import __version__
 
 APPEARANCE_KEY = "appearance/theme"
 MEDIA_SCOPE_KEY = "scan/default_media_scope"
@@ -90,11 +94,23 @@ def save_settings(store: QSettings, values: SettingsValues) -> None:
 class SettingsDialog(QDialog):
     """Small settings screen shared by macOS, Windows, and Linux."""
 
-    def __init__(self, values: SettingsValues, parent: QWidget | None = None) -> None:
+    check_updates_requested = Signal()
+
+    def __init__(
+        self,
+        values: SettingsValues,
+        parent: QWidget | None = None,
+        *,
+        app_version: str = __version__,
+    ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Reelabel Settings")
         self.setModal(True)
-        self.setMinimumWidth(460)
+        # Keep every section readable at default display scaling on all three
+        # platforms. The compact two-column controls avoid a needlessly wide
+        # dialog, while the minimum height prevents wrapped privacy text from
+        # colliding with the scan checkboxes.
+        self.setMinimumSize(560, 680)
 
         page = QVBoxLayout(self)
         page.setContentsMargins(24, 22, 24, 20)
@@ -176,6 +192,33 @@ class SettingsDialog(QDialog):
         confirmation_options.addWidget(confirmation_hint)
         page.addLayout(confirmation_options)
 
+        updates_heading = QLabel("Updates")
+        updates_heading.setObjectName("sectionTitle")
+        page.addWidget(updates_heading)
+
+        updates_row = QHBoxLayout()
+        updates_text = QVBoxLayout()
+        self.current_version = QLabel(f"Installed version: {app_version}")
+        update_privacy = QLabel(
+            "Reelabel connects to GitHub only when you click this button. "
+            "It never downloads or installs an update automatically."
+        )
+        update_privacy.setObjectName("muted")
+        update_privacy.setWordWrap(True)
+        updates_text.addWidget(self.current_version)
+        updates_text.addWidget(update_privacy)
+        updates_row.addLayout(updates_text, 1)
+        self.check_updates_button = QPushButton("Check for updates")
+        self.check_updates_button.clicked.connect(self.check_updates_requested.emit)
+        updates_row.addWidget(self.check_updates_button)
+        page.addLayout(updates_row)
+
+        self.update_status = QLabel("")
+        self.update_status.setObjectName("muted")
+        self.update_status.setWordWrap(True)
+        self.update_status.setVisible(False)
+        page.addWidget(self.update_status)
+
         safety_note = QLabel(
             "Related images and NFO files remain disabled and unchecked by "
             "default. Their separate permanent-deletion confirmation cannot "
@@ -195,6 +238,23 @@ class SettingsDialog(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         page.addWidget(buttons)
+
+    def set_update_checking(self, checking: bool) -> None:
+        """Keep the manual update control clear while its worker is running."""
+
+        self.check_updates_button.setEnabled(not checking)
+        self.check_updates_button.setText(
+            "Checking…" if checking else "Check for updates"
+        )
+        if checking:
+            self.update_status.setText("Contacting the official GitHub release page…")
+            self.update_status.setVisible(True)
+
+    def set_update_status(self, text: str) -> None:
+        """Show a concise result without changing any saved preference."""
+
+        self.update_status.setText(text)
+        self.update_status.setVisible(True)
 
     def values(self) -> SettingsValues:
         """Return the selections currently displayed by the dialog."""

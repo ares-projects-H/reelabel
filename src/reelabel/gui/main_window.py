@@ -5,11 +5,32 @@ from __future__ import annotations
 import json
 import re
 import sys
+import weakref
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-from PySide6.QtCore import QObject, QSettings, QStandardPaths, Qt, QThread, Signal, Slot
-from PySide6.QtGui import QAction, QDragEnterEvent, QDropEvent, QIcon, QKeySequence, QPixmap
+from PySide6.QtCore import (
+    QObject,
+    QSettings,
+    QStandardPaths,
+    Qt,
+    QThread,
+    QTimer,
+    QUrl,
+    Signal,
+    Slot,
+)
+from PySide6.QtGui import (
+    QAction,
+    QCloseEvent,
+    QDesktopServices,
+    QDragEnterEvent,
+    QDropEvent,
+    QIcon,
+    QKeySequence,
+    QPixmap,
+)
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -35,7 +56,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from reelabel import api, core
+from reelabel import __version__, api, core, updates
 
 from .settings import SettingsDialog, load_settings, save_settings
 from .styles import stylesheet
@@ -219,6 +240,32 @@ class ScanWorker(QObject):
             self.completed.emit(report)
 
 
+class UpdateWorker(QObject):
+    """Run an explicitly requested GitHub update check away from the UI thread."""
+
+    completed = Signal(object)
+    failed = Signal(str)
+
+    def __init__(self, checker: Callable[[], updates.UpdateCheckResult]) -> None:
+        super().__init__()
+        self.checker = checker
+
+    @Slot()
+    def run(self) -> None:
+        try:
+            result = self.checker()
+        except updates.UpdateNetworkError:
+            self.failed.emit("network")
+        except updates.UpdateVersionError:
+            self.failed.emit("version")
+        except updates.UpdateResponseError:
+            self.failed.emit("response")
+        except Exception:  # Keep unexpected implementation details out of the UI.
+            self.failed.emit("unexpected")
+        else:
+            self.completed.emit(result)
+
+
 class MainWindow(QMainWindow):
     """Modern interface for previewing and safely applying media renames."""
 
@@ -226,6 +273,7 @@ class MainWindow(QMainWindow):
         self,
         demo: bool = False,
         settings_store: QSettings | None = None,
+        update_checker: Callable[[], updates.UpdateCheckResult] | None = None,
     ) -> None:
         super().__init__()
         self.setWindowTitle("Reelabel")
@@ -240,11 +288,17 @@ class MainWindow(QMainWindow):
             "Reelabel",
         )
         self._preferences = load_settings(self._settings_store)
+        self._update_checker = update_checker or updates.check_for_updates
         self._apply_theme()
 
         self.current_report: api.ScanReport | None = None
         self._scan_thread: QThread | None = None
         self._scan_worker: ScanWorker | None = None
+        self._update_thread: QThread | None = None
+        self._update_worker: UpdateWorker | None = None
+        self._update_target: weakref.ReferenceType[SettingsDialog] | None = None
+        self._update_from_settings = False
+        self._close_after_update = False
         self._loading_table = False
         self._active_filter = "all"
         self._sort_column: int | None = None
@@ -304,7 +358,7 @@ class MainWindow(QMainWindow):
         page.addLayout(self._header())
 
         intro = QVBoxLayout()
-        eyebrow = QLabel("SAFE · LOCAL · OFFLINE")
+        eyebrow = QLabel("SAFE · LOCAL · PRIVATE")
         eyebrow.setObjectName("eyebrow")
         title = QLabel("Rename media files with confidence")
         title.setObjectName("title")
@@ -465,6 +519,10 @@ class MainWindow(QMainWindow):
         self.user_guide_action.triggered.connect(self._show_user_guide)
         self.help_menu.addAction(self.user_guide_action)
 
+        self.check_updates_action = QAction("Check for Updates…", self)
+        self.check_updates_action.triggered.connect(self._start_update_check)
+        self.help_menu.addAction(self.check_updates_action)
+
         self.help_menu.addSeparator()
         self.about_action = QAction("About Reelabel", self)
         # AboutRole moves this action into Reelabel → About Reelabel on macOS.
@@ -475,7 +533,10 @@ class MainWindow(QMainWindow):
     def _show_settings(self) -> None:
         """Open persistent, local-only interface and scan preferences."""
 
-        dialog = SettingsDialog(self._preferences, self)
+        dialog = SettingsDialog(self._preferences, self, app_version=__version__)
+        dialog.check_updates_requested.connect(
+            lambda: self._start_update_check(dialog)
+        )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         self._preferences = dialog.values()
@@ -485,7 +546,7 @@ class MainWindow(QMainWindow):
         self.notice.setText("✓ Settings saved locally")
 
     def _show_about(self) -> None:
-        """Show the application identity and its offline privacy promise."""
+        """Show the application identity and its privacy promise."""
 
         message = QMessageBox(self)
         message.setWindowTitle("About Reelabel")
@@ -499,11 +560,12 @@ class MainWindow(QMainWindow):
                     Qt.TransformationMode.SmoothTransformation,
                 )
             )
-        message.setText("<b>Reelabel 0.1.0</b>")
+        message.setText(f"<b>Reelabel {__version__}</b>")
         message.setInformativeText(
-            "A safe, offline desktop app for previewing and renaming local "
+            "A safe, privacy-focused desktop app for previewing and renaming local "
             "media files.\n\nLicensed under the MIT License.\n"
-            "No analytics, telemetry, or automatic network access."
+            "No analytics, telemetry, or background network access. "
+            "GitHub is contacted only when you choose Check for Updates."
         )
         message.setStandardButtons(QMessageBox.StandardButton.Ok)
         message.exec()
@@ -531,6 +593,8 @@ class MainWindow(QMainWindow):
             "<b>Settings</b>. Destination checks and rollback always remain active.</p>"
             "<p>Related images and NFO files stay disabled and unchecked by "
             "default.</p>"
+            "<p><b>Check for Updates</b> contacts the official GitHub release "
+            "only when you choose it. It never downloads or installs an update.</p>"
         )
         guide.setWordWrap(True)
         guide.setTextFormat(Qt.TextFormat.RichText)
@@ -561,7 +625,7 @@ class MainWindow(QMainWindow):
         brand.setObjectName("brand")
         history = QPushButton("History / Undo")
         history.clicked.connect(self._show_history)
-        version = QLabel("VERSION 0.1.0")
+        version = QLabel(f"VERSION {__version__}")
         version.setObjectName("muted")
         header.addWidget(icon_label)
         header.addWidget(brand)
@@ -569,6 +633,139 @@ class MainWindow(QMainWindow):
         header.addWidget(history)
         header.addWidget(version)
         return header
+
+    @Slot()
+    def _start_update_check(self, target: SettingsDialog | None = None) -> None:
+        """Start the only optional network operation offered by Reelabel."""
+
+        if self._update_thread is not None and self._update_thread.isRunning():
+            if target is not None:
+                target.set_update_status("An update check is already running.")
+            return
+
+        self.check_updates_action.setEnabled(False)
+        self._update_from_settings = target is not None
+        self._update_target = weakref.ref(target) if target is not None else None
+        if target is not None:
+            target.set_update_checking(True)
+
+        thread = QThread(self)
+        worker = UpdateWorker(self._update_checker)
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run)
+        worker.completed.connect(self._update_check_completed)
+        worker.failed.connect(self._update_check_failed)
+        worker.completed.connect(thread.quit)
+        worker.failed.connect(thread.quit)
+        thread.finished.connect(worker.deleteLater)
+        thread.finished.connect(self._update_thread_finished)
+        thread.finished.connect(thread.deleteLater)
+        self._update_thread = thread
+        self._update_worker = worker
+        thread.start()
+
+    def _update_target_dialog(self) -> SettingsDialog | None:
+        """Return the still-open Settings dialog that started the check."""
+
+        if self._update_target is None:
+            return None
+        target = self._update_target()
+        if target is None:
+            return None
+        try:
+            return target if target.isVisible() else None
+        except RuntimeError:  # The underlying Qt dialog has already been deleted.
+            return None
+
+    @Slot(object)
+    def _update_check_completed(self, result: updates.UpdateCheckResult) -> None:
+        target = self._update_target_dialog()
+        if result.update_available:
+            status = f"Reelabel {result.latest_version} is available."
+        elif result.current_is_newer:
+            status = (
+                f"This Reelabel {result.current_version} build is newer than the latest "
+                f"published release ({result.latest_version})."
+            )
+        else:
+            status = f"Reelabel {result.current_version} is up to date."
+        if target is not None:
+            target.set_update_status(status)
+        if not self._close_after_update and (not self._update_from_settings or target is not None):
+            self._show_update_result(result, target)
+
+    def _show_update_result(
+        self,
+        result: updates.UpdateCheckResult,
+        parent: QWidget | None = None,
+    ) -> None:
+        """Present a verified result and open GitHub only after another click."""
+
+        dialog_parent = parent or self
+        if result.current_is_newer:
+            QMessageBox.information(
+                dialog_parent,
+                "No update available",
+                f"This Reelabel {result.current_version} build is newer than the latest "
+                f"published release ({result.latest_version}).",
+            )
+            return
+        if not result.update_available:
+            QMessageBox.information(
+                dialog_parent,
+                "Reelabel is up to date",
+                f"You are using the latest published version ({result.current_version}).",
+            )
+            return
+
+        message = QMessageBox(dialog_parent)
+        message.setWindowTitle("Reelabel update available")
+        message.setText(f"Reelabel {result.latest_version} is available.")
+        message.setInformativeText(
+            "Open the official GitHub release page to review and download it? "
+            "Reelabel will not download or install anything automatically."
+        )
+        message.setStandardButtons(QMessageBox.StandardButton.Cancel)
+        open_button = message.addButton(
+            "Open download page",
+            QMessageBox.ButtonRole.AcceptRole,
+        )
+        message.setDefaultButton(open_button)
+        message.exec()
+        if message.clickedButton() is open_button:
+            QDesktopServices.openUrl(QUrl(result.release_url))
+
+    @Slot(str)
+    def _update_check_failed(self, reason: str) -> None:
+        descriptions = {
+            "network": (
+                "Reelabel could not reach GitHub. Check your connection and try again. "
+                "Renaming remains fully available offline."
+            ),
+            "version": "Reelabel could not verify the release version returned by GitHub.",
+            "response": "GitHub returned release information that Reelabel could not verify.",
+            "unexpected": "The update check could not be completed safely.",
+        }
+        text = descriptions.get(reason, descriptions["unexpected"])
+        target = self._update_target_dialog()
+        if target is not None:
+            target.set_update_status(text)
+        if not self._close_after_update and (not self._update_from_settings or target is not None):
+            QMessageBox.warning(target or self, "Could not check for updates", text)
+
+    @Slot()
+    def _update_thread_finished(self) -> None:
+        target = self._update_target_dialog()
+        if target is not None:
+            target.set_update_checking(False)
+        self._update_thread = None
+        self._update_worker = None
+        self._update_target = None
+        self._update_from_settings = False
+        self.check_updates_action.setEnabled(True)
+        if self._close_after_update:
+            self._close_after_update = False
+            QTimer.singleShot(0, self.close)
 
     def _browse(self) -> None:
         folder = QFileDialog.getExistingDirectory(self, "Choose a media folder")
@@ -1386,11 +1583,18 @@ class MainWindow(QMainWindow):
         undo_button.clicked.connect(restore_selected)
         dialog.exec()
 
-    def closeEvent(self, event) -> None:  # noqa: N802, ANN001
+    def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802
+        """Finish active workers before Qt destroys their owning window."""
+
         if self._scan_thread is not None and self._scan_thread.isRunning():
             self._scan_thread.requestInterruption()
             self.notice.setText("Stopping the read-only scan before closing…")
             event.ignore()
             self._scan_thread.finished.connect(self.close)
+            return
+        if self._update_thread is not None and self._update_thread.isRunning():
+            self._close_after_update = True
+            self.hide()
+            event.ignore()
             return
         super().closeEvent(event)

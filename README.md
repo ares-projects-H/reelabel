@@ -9,13 +9,14 @@
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
 </p>
 
-Reelabel is a safe, offline desktop utility for cleaning the names of
+Reelabel is a safe, privacy-focused desktop utility for cleaning the names of
 movie, series, and subtitle files, as well as their containing release folders.
 It always previews proposed changes first, preserves media contents, and
 refuses ambiguous or conflicting operations.
 
 > Current release: v0.1.0.
 > The installers are unsigned, so begin with a copied test folder.
+> The next feature version, v0.2.0, is under development.
 
 ## Interface preview
 
@@ -36,6 +37,7 @@ Reelabel includes:
 - preview columns that can be resized by dragging and sorted by clicking their
   headers;
 - native application menus and local appearance/scan-default settings;
+- an optional update check that contacts GitHub only after an explicit click;
 - proposed names that can be edited by double-clicking a cell in the
   **Proposed name** column;
 - editable folder-name proposals for movies, series, and other media collections;
@@ -50,7 +52,7 @@ Reelabel includes:
 
 ## Install the app
 
-When version 0.1.0 is published, download the package for your platform from the
+Download the current package for your platform from the
 [latest GitHub release](https://github.com/ares-projects-H/reelabel/releases/latest):
 
 - Windows 10/11 x64: installer EXE;
@@ -61,7 +63,9 @@ When version 0.1.0 is published, download the package for your platform from the
 The first release is unsigned, so Windows SmartScreen or macOS Gatekeeper may
 show a warning. Before opening the download, compare it with
 `SHA256SUMS.txt`. The [step-by-step installation guide](docs/installation.md)
-explains how to do this on each system.
+explains how to do this on each system. The
+[signing roadmap](docs/signing-roadmap.md) documents future Windows and macOS
+publisher signing without claiming that it is active today.
 
 ## First use in eight steps
 
@@ -90,7 +94,9 @@ defaults, and whether to show the rename confirmation. Choosing
 Destination validation, automatic restoration, History / Undo, and the
 separate image/NFO deletion confirmation are never disabled by this option.
 Settings remain local and cannot enable analytics, background networking, or
-automatic updates.
+automatic updates. **Help → Check for Updates…** and the button in Settings
+contact the official GitHub release page only when clicked. Reelabel never
+downloads or installs an update automatically. See the [privacy policy](PRIVACY.md).
 
 ## Run from source for development
 
@@ -127,7 +133,9 @@ the media folder you explicitly authorize.
 
 ## Safety principles
 
-- No Internet access or analytics.
+- No analytics, telemetry, or background network access.
+- The optional update check sends no filenames or settings and runs only after
+  an explicit click.
 - No media content changes.
 - Folder renames are always previewed, editable, and individually selectable.
 - No overwriting existing files.
@@ -145,6 +153,8 @@ time, so reviews may take several days or longer.
 Please report security problems privately using the instructions in
 [SECURITY.md](SECURITY.md). Maintainers can follow the
 [safe GitHub review and release guide](docs/maintainer-guide.md).
+Reelabel's local data and manual update behavior are documented in
+[PRIVACY.md](PRIVACY.md).
 
 ## Contributors
 

@@ -12,9 +12,9 @@ if PYSIDE_AVAILABLE:
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     from PySide6.QtCore import QSettings, Qt, QTimer
     from PySide6.QtGui import QAction
-    from PySide6.QtWidgets import QApplication, QHeaderView, QMessageBox
+    from PySide6.QtWidgets import QApplication, QHeaderView, QLabel, QMessageBox
 
-    from reelabel import api
+    from reelabel import __version__, api, updates
     from reelabel.gui.main_window import DEMO_ROWS, KIND_ROLE, MainWindow
     from reelabel.gui.settings import (
         SettingsDialog,
@@ -89,6 +89,8 @@ class GuiPrototypeTests(unittest.TestCase):
 
     def test_settings_dropdowns_fit_their_complete_labels(self) -> None:
         dialog = SettingsDialog(SettingsValues())
+        self.assertGreaterEqual(dialog.minimumWidth(), 560)
+        self.assertGreaterEqual(dialog.minimumHeight(), 680)
         for combo in (dialog.appearance, dialog.media_scope):
             widest_label = max(
                 combo.fontMetrics().horizontalAdvance(combo.itemText(index))
@@ -128,7 +130,17 @@ class GuiPrototypeTests(unittest.TestCase):
         self.assertIn(window.quit_action, window.file_menu.actions())
         self.assertIn(window.about_action, window.help_menu.actions())
         self.assertIn(window.user_guide_action, window.help_menu.actions())
+        self.assertIn(window.check_updates_action, window.help_menu.actions())
         window.close()
+
+    def test_settings_explain_the_manual_update_connection(self) -> None:
+        dialog = SettingsDialog(SettingsValues())
+        self.assertEqual(dialog.current_version.text(), f"Installed version: {__version__}")
+        self.assertEqual(dialog.check_updates_button.text(), "Check for updates")
+        labels = " ".join(label.text() for label in dialog.findChildren(QLabel))
+        self.assertIn("connects to GitHub only when you click", labels)
+        self.assertIn("never downloads or installs", labels)
+        dialog.close()
 
     def test_batch_edit_preserves_episode_numbers(self) -> None:
         window = MainWindow(demo=False)
@@ -206,6 +218,64 @@ def test_real_scan_runs_in_worker_and_enables_safe_apply(qtbot, tmp_path: Path) 
     )
     assert window.table.rowCount() >= 1
     assert window.apply_button.isEnabled()
+
+
+@unittest.skipUnless(PYSIDE_AVAILABLE, "PySide6 is not installed")
+def test_startup_settings_and_scan_do_not_check_for_updates(qtbot, tmp_path: Path) -> None:
+    calls: list[bool] = []
+
+    def unexpected_update_check():
+        calls.append(True)
+        raise AssertionError("Update checks must require an explicit click")
+
+    (tmp_path / "Glass Meridian.2007.DVDRip.XviD.AC3.mkv").touch()
+    window = MainWindow(demo=False, update_checker=unexpected_update_check)
+    qtbot.addWidget(window)
+    dialog = SettingsDialog(SettingsValues(), window)
+    dialog.show()
+    dialog.close()
+    window.path_edit.setText(str(tmp_path))
+    window.scan_button.click()
+    qtbot.waitUntil(lambda: window._scan_thread is None, timeout=3000)
+
+    assert calls == []
+
+
+@unittest.skipUnless(PYSIDE_AVAILABLE, "PySide6 is not installed")
+def test_manual_update_button_runs_worker_and_reports_result(qtbot, monkeypatch) -> None:
+    calls: list[bool] = []
+    result = updates.UpdateCheckResult(
+        current_version="0.1.0",
+        latest_version="0.2.0",
+        update_available=True,
+        release_url="https://github.com/ares-projects-H/reelabel/releases/tag/v0.2.0",
+    )
+
+    def check_now():
+        calls.append(True)
+        return result
+
+    window = MainWindow(demo=False, update_checker=check_now)
+    qtbot.addWidget(window)
+    shown: list[tuple[updates.UpdateCheckResult, object]] = []
+    monkeypatch.setattr(
+        window,
+        "_show_update_result",
+        lambda update_result, parent=None: shown.append((update_result, parent)),
+    )
+    dialog = SettingsDialog(SettingsValues(), window)
+    qtbot.addWidget(dialog)
+    dialog.check_updates_requested.connect(lambda: window._start_update_check(dialog))
+    dialog.show()
+
+    assert calls == []
+    dialog.check_updates_button.click()
+    qtbot.waitUntil(lambda: window._update_thread is None, timeout=3000)
+
+    assert calls == [True]
+    assert shown == [(result, dialog)]
+    assert dialog.check_updates_button.isEnabled()
+    assert dialog.update_status.text() == "Reelabel 0.2.0 is available."
 
 
 @unittest.skipUnless(PYSIDE_AVAILABLE, "PySide6 is not installed")
