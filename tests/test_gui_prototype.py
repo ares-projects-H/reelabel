@@ -258,24 +258,102 @@ def test_manual_update_button_runs_worker_and_reports_result(qtbot, monkeypatch)
     window = MainWindow(demo=False, update_checker=check_now)
     qtbot.addWidget(window)
     shown: list[tuple[updates.UpdateCheckResult, object]] = []
-    monkeypatch.setattr(
-        window,
-        "_show_update_result",
-        lambda update_result, parent=None: shown.append((update_result, parent)),
-    )
     dialog = SettingsDialog(SettingsValues(), window)
     qtbot.addWidget(dialog)
     dialog.check_updates_requested.connect(lambda: window._start_update_check(dialog))
     dialog.show()
 
+    def record_result(update_result, parent=None):
+        # Progress controls must be restored before any modal result appears.
+        assert dialog.check_updates_button.isEnabled()
+        assert window.check_updates_action.isEnabled()
+        shown.append((update_result, parent))
+
+    monkeypatch.setattr(window, "_show_update_result", record_result)
+
     assert calls == []
     dialog.check_updates_button.click()
-    qtbot.waitUntil(lambda: window._update_thread is None, timeout=3000)
+    qtbot.waitUntil(
+        lambda: window._update_thread is None and bool(shown),
+        timeout=3000,
+    )
 
     assert calls == [True]
     assert shown == [(result, dialog)]
     assert dialog.check_updates_button.isEnabled()
     assert dialog.update_status.text() == "Reelabel 0.2.0 is available."
+
+
+@unittest.skipUnless(PYSIDE_AVAILABLE, "PySide6 is not installed")
+def test_failed_update_check_restores_button_and_shows_error(qtbot, monkeypatch) -> None:
+    def fail_check():
+        raise updates.UpdateNetworkError("offline")
+
+    window = MainWindow(demo=False, update_checker=fail_check)
+    qtbot.addWidget(window)
+    dialog = SettingsDialog(SettingsValues(), window)
+    qtbot.addWidget(dialog)
+    dialog.check_updates_requested.connect(lambda: window._start_update_check(dialog))
+    dialog.show()
+    shown: list[tuple[str, object]] = []
+
+    def record_failure(reason: str, parent=None):
+        assert dialog.check_updates_button.isEnabled()
+        assert window.check_updates_action.isEnabled()
+        shown.append((reason, parent))
+
+    monkeypatch.setattr(window, "_show_update_failure", record_failure)
+    dialog.check_updates_button.click()
+    qtbot.waitUntil(
+        lambda: window._update_thread is None and bool(shown),
+        timeout=3000,
+    )
+
+    assert shown == [("network", dialog)]
+    assert dialog.check_updates_button.text() == "Check for updates"
+    assert dialog.update_status.text().startswith("Reelabel could not reach GitHub.")
+
+
+@unittest.skipUnless(PYSIDE_AVAILABLE, "PySide6 is not installed")
+def test_update_result_messages_cover_current_and_newer_builds(qtbot, monkeypatch) -> None:
+    window = MainWindow(demo=False)
+    qtbot.addWidget(window)
+    messages: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        window,
+        "_show_update_information",
+        lambda parent, title, text: messages.append((title, text)),
+    )
+
+    window._show_update_result(
+        updates.UpdateCheckResult(
+            current_version="0.2.0",
+            latest_version="0.2.0",
+            update_available=False,
+            release_url="https://github.com/ares-projects-H/reelabel/releases/tag/v0.2.0",
+        )
+    )
+    window._show_update_result(
+        updates.UpdateCheckResult(
+            current_version="0.2.0",
+            latest_version="0.1.0",
+            update_available=False,
+            release_url="https://github.com/ares-projects-H/reelabel/releases/tag/v0.1.0",
+            current_is_newer=True,
+        )
+    )
+
+    assert messages == [
+        (
+            "Reelabel is up to date",
+            "You are using the latest published version (0.2.0).",
+        ),
+        (
+            "No update available",
+            "This Reelabel 0.2.0 build is newer than the latest published release "
+            "(0.1.0).",
+        ),
+    ]
 
 
 @unittest.skipUnless(PYSIDE_AVAILABLE, "PySide6 is not installed")

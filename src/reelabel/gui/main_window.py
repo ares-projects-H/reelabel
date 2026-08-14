@@ -299,6 +299,8 @@ class MainWindow(QMainWindow):
         self._update_target: weakref.ReferenceType[SettingsDialog] | None = None
         self._update_from_settings = False
         self._close_after_update = False
+        self._pending_update_result: updates.UpdateCheckResult | None = None
+        self._pending_update_failure: str | None = None
         self._loading_table = False
         self._active_filter = "all"
         self._sort_column: int | None = None
@@ -646,6 +648,8 @@ class MainWindow(QMainWindow):
         self.check_updates_action.setEnabled(False)
         self._update_from_settings = target is not None
         self._update_target = weakref.ref(target) if target is not None else None
+        self._pending_update_result = None
+        self._pending_update_failure = None
         if target is not None:
             target.set_update_checking(True)
 
@@ -691,8 +695,10 @@ class MainWindow(QMainWindow):
             status = f"Reelabel {result.current_version} is up to date."
         if target is not None:
             target.set_update_status(status)
-        if not self._close_after_update and (not self._update_from_settings or target is not None):
-            self._show_update_result(result, target)
+        # Present the modal result only after QThread has fully stopped. This
+        # guarantees that the Settings button is restored before a message box
+        # opens and avoids platform-specific modal-window ordering problems.
+        self._pending_update_result = result
 
     def _show_update_result(
         self,
@@ -703,7 +709,7 @@ class MainWindow(QMainWindow):
 
         dialog_parent = parent or self
         if result.current_is_newer:
-            QMessageBox.information(
+            self._show_update_information(
                 dialog_parent,
                 "No update available",
                 f"This Reelabel {result.current_version} build is newer than the latest "
@@ -711,7 +717,7 @@ class MainWindow(QMainWindow):
             )
             return
         if not result.update_available:
-            QMessageBox.information(
+            self._show_update_information(
                 dialog_parent,
                 "Reelabel is up to date",
                 f"You are using the latest published version ({result.current_version}).",
@@ -719,6 +725,7 @@ class MainWindow(QMainWindow):
             return
 
         message = QMessageBox(dialog_parent)
+        message.setIcon(QMessageBox.Icon.Information)
         message.setWindowTitle("Reelabel update available")
         message.setText(f"Reelabel {result.latest_version} is available.")
         message.setInformativeText(
@@ -731,9 +738,33 @@ class MainWindow(QMainWindow):
             QMessageBox.ButtonRole.AcceptRole,
         )
         message.setDefaultButton(open_button)
+        message.setWindowModality(Qt.WindowModality.ApplicationModal)
+        message.show()
+        message.raise_()
+        message.activateWindow()
         message.exec()
         if message.clickedButton() is open_button:
             QDesktopServices.openUrl(QUrl(result.release_url))
+
+    def _show_update_information(
+        self,
+        parent: QWidget,
+        title: str,
+        text: str,
+    ) -> None:
+        """Show an update result in front of Reelabel on every platform."""
+
+        message = QMessageBox(parent)
+        message.setIcon(QMessageBox.Icon.Information)
+        message.setWindowTitle(title)
+        message.setText(text)
+        message.setStandardButtons(QMessageBox.StandardButton.Ok)
+        message.setDefaultButton(QMessageBox.StandardButton.Ok)
+        message.setWindowModality(Qt.WindowModality.ApplicationModal)
+        message.show()
+        message.raise_()
+        message.activateWindow()
+        message.exec()
 
     @Slot(str)
     def _update_check_failed(self, reason: str) -> None:
@@ -750,22 +781,72 @@ class MainWindow(QMainWindow):
         target = self._update_target_dialog()
         if target is not None:
             target.set_update_status(text)
-        if not self._close_after_update and (not self._update_from_settings or target is not None):
-            QMessageBox.warning(target or self, "Could not check for updates", text)
+        self._pending_update_failure = reason
+
+    def _show_update_failure(self, reason: str, parent: QWidget | None = None) -> None:
+        """Explain a failed check after the worker and its progress state end."""
+
+        descriptions = {
+            "network": (
+                "Reelabel could not reach GitHub. Check your connection and try again. "
+                "Renaming remains fully available offline."
+            ),
+            "version": "Reelabel could not verify the release version returned by GitHub.",
+            "response": "GitHub returned release information that Reelabel could not verify.",
+            "unexpected": "The update check could not be completed safely.",
+        }
+        text = descriptions.get(reason, descriptions["unexpected"])
+        message = QMessageBox(parent or self)
+        message.setIcon(QMessageBox.Icon.Warning)
+        message.setWindowTitle("Could not check for updates")
+        message.setText(text)
+        message.setStandardButtons(QMessageBox.StandardButton.Ok)
+        message.setDefaultButton(QMessageBox.StandardButton.Ok)
+        message.setWindowModality(Qt.WindowModality.ApplicationModal)
+        message.show()
+        message.raise_()
+        message.activateWindow()
+        message.exec()
 
     @Slot()
     def _update_thread_finished(self) -> None:
         target = self._update_target_dialog()
+        result = self._pending_update_result
+        failure = self._pending_update_failure
+        from_settings = self._update_from_settings
         if target is not None:
             target.set_update_checking(False)
         self._update_thread = None
         self._update_worker = None
         self._update_target = None
         self._update_from_settings = False
+        self._pending_update_result = None
+        self._pending_update_failure = None
         self.check_updates_action.setEnabled(True)
         if self._close_after_update:
             self._close_after_update = False
             QTimer.singleShot(0, self.close)
+            return
+
+        # Defer by one event-loop turn so Qt first repaints the restored button
+        # and closes the worker thread cleanly. The result can then never be
+        # hidden behind the modal Settings window.
+        if result is not None and (not from_settings or target is not None):
+            QTimer.singleShot(
+                0,
+                lambda checked=result, dialog=target: self._show_update_result(
+                    checked,
+                    dialog,
+                ),
+            )
+        elif failure is not None and (not from_settings or target is not None):
+            QTimer.singleShot(
+                0,
+                lambda reason=failure, dialog=target: self._show_update_failure(
+                    reason,
+                    dialog,
+                ),
+            )
 
     def _browse(self) -> None:
         folder = QFileDialog.getExistingDirectory(self, "Choose a media folder")
