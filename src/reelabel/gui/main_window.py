@@ -91,6 +91,16 @@ REASON_TRANSLATIONS = {
     "folder name normalized": "Normalized folder name.",
 }
 
+UPDATE_FAILURE_MESSAGES = {
+    "network": (
+        "Reelabel could not reach GitHub. Check your connection and try again. "
+        "Renaming remains fully available offline."
+    ),
+    "version": "Reelabel could not verify the release version returned by GitHub.",
+    "response": "GitHub returned release information that Reelabel could not verify.",
+    "unexpected": "The update check could not be completed safely.",
+}
+
 
 @dataclass(frozen=True)
 class DemoRow:
@@ -301,6 +311,7 @@ class MainWindow(QMainWindow):
         self._close_after_update = False
         self._pending_update_result: updates.UpdateCheckResult | None = None
         self._pending_update_failure: str | None = None
+        self._update_notice_before_check: str | None = None
         self._loading_table = False
         self._active_filter = "all"
         self._sort_column: int | None = None
@@ -522,7 +533,11 @@ class MainWindow(QMainWindow):
         self.help_menu.addAction(self.user_guide_action)
 
         self.check_updates_action = QAction("Check for Updates…", self)
-        self.check_updates_action.triggered.connect(self._start_update_check)
+        # QAction.triggered emits a boolean. Do not pass that value to
+        # _start_update_check, whose optional argument is a SettingsDialog.
+        self.check_updates_action.triggered.connect(
+            lambda _checked=False: self._start_update_check()
+        )
         self.help_menu.addAction(self.check_updates_action)
 
         self.help_menu.addSeparator()
@@ -652,6 +667,8 @@ class MainWindow(QMainWindow):
         self._pending_update_failure = None
         if target is not None:
             target.set_update_checking(True)
+        else:
+            self._show_update_activity()
 
         thread = QThread(self)
         worker = UpdateWorker(self._update_checker)
@@ -667,6 +684,22 @@ class MainWindow(QMainWindow):
         self._update_thread = thread
         self._update_worker = worker
         thread.start()
+
+    def _show_update_activity(self) -> None:
+        """Make a Help-menu update check visible without another modal window."""
+
+        if self._update_notice_before_check is not None:
+            return
+        self._update_notice_before_check = self.notice.text()
+        self.notice.setText("↻ Checking the official GitHub release…")
+
+    def _restore_update_activity(self) -> None:
+        """Restore the main status notice before presenting the final result."""
+
+        if self._update_notice_before_check is None:
+            return
+        self.notice.setText(self._update_notice_before_check)
+        self._update_notice_before_check = None
 
     def _update_target_dialog(self) -> SettingsDialog | None:
         """Return the still-open Settings dialog that started the check."""
@@ -768,16 +801,7 @@ class MainWindow(QMainWindow):
 
     @Slot(str)
     def _update_check_failed(self, reason: str) -> None:
-        descriptions = {
-            "network": (
-                "Reelabel could not reach GitHub. Check your connection and try again. "
-                "Renaming remains fully available offline."
-            ),
-            "version": "Reelabel could not verify the release version returned by GitHub.",
-            "response": "GitHub returned release information that Reelabel could not verify.",
-            "unexpected": "The update check could not be completed safely.",
-        }
-        text = descriptions.get(reason, descriptions["unexpected"])
+        text = UPDATE_FAILURE_MESSAGES.get(reason, UPDATE_FAILURE_MESSAGES["unexpected"])
         target = self._update_target_dialog()
         if target is not None:
             target.set_update_status(text)
@@ -786,27 +810,22 @@ class MainWindow(QMainWindow):
     def _show_update_failure(self, reason: str, parent: QWidget | None = None) -> None:
         """Explain a failed check after the worker and its progress state end."""
 
-        descriptions = {
-            "network": (
-                "Reelabel could not reach GitHub. Check your connection and try again. "
-                "Renaming remains fully available offline."
-            ),
-            "version": "Reelabel could not verify the release version returned by GitHub.",
-            "response": "GitHub returned release information that Reelabel could not verify.",
-            "unexpected": "The update check could not be completed safely.",
-        }
-        text = descriptions.get(reason, descriptions["unexpected"])
+        text = UPDATE_FAILURE_MESSAGES.get(reason, UPDATE_FAILURE_MESSAGES["unexpected"])
         message = QMessageBox(parent or self)
         message.setIcon(QMessageBox.Icon.Warning)
         message.setWindowTitle("Could not check for updates")
         message.setText(text)
-        message.setStandardButtons(QMessageBox.StandardButton.Ok)
-        message.setDefaultButton(QMessageBox.StandardButton.Ok)
+        message.setStandardButtons(QMessageBox.StandardButton.Close)
+        retry_button = message.addButton("Try again", QMessageBox.ButtonRole.AcceptRole)
+        message.setDefaultButton(retry_button)
         message.setWindowModality(Qt.WindowModality.ApplicationModal)
         message.show()
         message.raise_()
         message.activateWindow()
         message.exec()
+        if message.clickedButton() is retry_button:
+            settings = parent if isinstance(parent, SettingsDialog) else None
+            QTimer.singleShot(0, lambda: self._start_update_check(settings))
 
     @Slot()
     def _update_thread_finished(self) -> None:
@@ -814,6 +833,7 @@ class MainWindow(QMainWindow):
         result = self._pending_update_result
         failure = self._pending_update_failure
         from_settings = self._update_from_settings
+        self._restore_update_activity()
         if target is not None:
             target.set_update_checking(False)
         self._update_thread = None

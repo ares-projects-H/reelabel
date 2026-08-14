@@ -285,6 +285,84 @@ def test_manual_update_button_runs_worker_and_reports_result(qtbot, monkeypatch)
 
 
 @unittest.skipUnless(PYSIDE_AVAILABLE, "PySide6 is not installed")
+def test_help_update_action_starts_without_treating_checked_as_settings(
+    qtbot,
+    monkeypatch,
+) -> None:
+    calls: list[bool] = []
+    result = updates.UpdateCheckResult(
+        current_version="0.2.0",
+        latest_version="0.1.0",
+        update_available=False,
+        release_url="https://github.com/ares-projects-H/reelabel/releases/tag/v0.1.0",
+        current_is_newer=True,
+    )
+
+    def check_now():
+        calls.append(True)
+        return result
+
+    window = MainWindow(demo=False, update_checker=check_now)
+    qtbot.addWidget(window)
+    shown: list[tuple[updates.UpdateCheckResult, object]] = []
+    monkeypatch.setattr(
+        window,
+        "_show_update_result",
+        lambda update_result, parent=None: shown.append((update_result, parent)),
+    )
+
+    window.check_updates_action.trigger()
+    assert window._update_notice_before_check is not None
+    assert window.notice.text() == "↻ Checking the official GitHub release…"
+    qtbot.waitUntil(
+        lambda: window._update_thread is None and bool(shown),
+        timeout=3000,
+    )
+
+    assert calls == [True]
+    assert shown == [(result, None)]
+    assert window._update_notice_before_check is None
+    assert window.check_updates_action.isEnabled()
+
+
+@unittest.skipUnless(PYSIDE_AVAILABLE, "PySide6 is not installed")
+def test_help_update_action_displays_visible_result(qtbot) -> None:
+    result = updates.UpdateCheckResult(
+        current_version="0.2.0",
+        latest_version="0.1.0",
+        update_available=False,
+        release_url="https://github.com/ares-projects-H/reelabel/releases/tag/v0.1.0",
+        current_is_newer=True,
+    )
+    window = MainWindow(demo=False, update_checker=lambda: result)
+    qtbot.addWidget(window)
+    window.show()
+    messages: list[tuple[str, str]] = []
+
+    def accept_result_when_visible() -> None:
+        for widget in QApplication.topLevelWidgets():
+            if (
+                isinstance(widget, QMessageBox)
+                and widget.isVisible()
+                and "newer than the latest published release" in widget.text()
+            ):
+                messages.append((widget.windowTitle(), widget.text()))
+                widget.accept()
+                return
+        QTimer.singleShot(10, accept_result_when_visible)
+
+    QTimer.singleShot(0, accept_result_when_visible)
+    window.check_updates_action.trigger()
+    qtbot.waitUntil(
+        lambda: bool(messages),
+        timeout=3000,
+    )
+
+    assert "newer than the latest published release" in messages[0][1]
+    assert window.check_updates_action.isEnabled()
+
+
+@unittest.skipUnless(PYSIDE_AVAILABLE, "PySide6 is not installed")
 def test_failed_update_check_restores_button_and_shows_error(qtbot, monkeypatch) -> None:
     def fail_check():
         raise updates.UpdateNetworkError("offline")
