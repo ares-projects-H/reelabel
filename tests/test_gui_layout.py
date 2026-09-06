@@ -1,10 +1,27 @@
 """Geometry and keyboard checks, also run under simulated Qt display scales."""
 
+import pytest
 from PySide6.QtCore import QPoint, QSettings, Qt
 from PySide6.QtWidgets import QApplication, QDialogButtonBox, QLineEdit
 
 from reelabel.gui.main_window import MainWindow
 from reelabel.gui.settings import SettingsDialog, SettingsValues
+
+
+@pytest.mark.parametrize("pixels", [13, 24])
+def test_combo_refits_after_final_font_and_style_change(qtbot, pixels):
+    dialog = SettingsDialog(SettingsValues())
+    qtbot.addWidget(dialog)
+    combo = dialog.media_scope
+    combo.setStyleSheet(f"QComboBox {{ font-size: {pixels}px; }}")
+    dialog.show()
+    qtbot.wait(10)
+    widest = max(
+        combo.fontMetrics().horizontalAdvance(combo.itemText(i)) for i in range(combo.count())
+    )
+    assert combo.width() >= widest + 48
+    assert combo.width() >= combo.minimumSizeHint().width()
+    assert combo.view().minimumWidth() >= widest + 64
 
 
 def test_compact_workspace_and_keyboard_editor(qtbot, tmp_path):

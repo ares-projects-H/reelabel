@@ -41,9 +41,12 @@ Codex skill has byte-identical API/engine sources, checked by tests.
 
 ## Reproducible verification
 
-Local result: **111 passed**, Ruff passed, `git diff --check` passed. Both
+Local result: **113 passed**, Ruff passed, `git diff --check` passed. The
 layout checks also passed at each additional simulated scale (125%, 150%, 200%).
 The rebuilt local macOS executable passed the scan/assets/Settings package smoke.
+The initial Windows CI run caught construction-time dropdown font measurements.
+Choices now refit after final font/style changes while staying bounded, with
+regression checks at two font sizes. Superseded candidate builds are not for use.
 
 ```sh
 ruff check src tests scripts packaging/entrypoint.py

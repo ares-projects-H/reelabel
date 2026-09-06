@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QEvent, QObject, Qt, Signal
 from PySide6.QtGui import QDragEnterEvent, QDropEvent
 from PySide6.QtWidgets import QComboBox, QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
 
@@ -52,14 +52,44 @@ def rule() -> QFrame:
 
 
 def fit_combo(combo: QComboBox) -> None:
-    """Reserve space for the longest label, padding and native dropdown affordance."""
-    if not combo.count():
-        return
-    widest = max(
-        combo.fontMetrics().horizontalAdvance(combo.itemText(i)) for i in range(combo.count())
-    )
-    combo.setFixedWidth(max(168, widest + 48))
-    combo.view().setMinimumWidth(max(200, widest + 64))
+    """Keep choices bounded, using the final platform font rather than construction-time metrics."""
+    combo.ensurePolished()
+    fitter = _ComboFitter(combo)
+    combo.installEventFilter(fitter)
+    combo._label_fitter = fitter
+    fitter.fit()
+
+
+class _ComboFitter(QObject):
+    def __init__(self, combo):
+        super().__init__(combo)
+        self.combo = combo
+        self.fitting = False
+
+    def fit(self):
+        if self.fitting or not self.combo.count():
+            return
+        self.fitting = True
+        try:
+            combo = self.combo
+            widest = max(
+                combo.fontMetrics().horizontalAdvance(combo.itemText(i))
+                for i in range(combo.count())
+            )
+            combo.setFixedWidth(max(168, widest + 48, combo.minimumSizeHint().width()))
+            combo.view().setMinimumWidth(max(200, widest + 64))
+        finally:
+            self.fitting = False
+
+    def eventFilter(self, watched, event):  # noqa: N802
+        if event.type() in {
+            QEvent.Type.Show,
+            QEvent.Type.FontChange,
+            QEvent.Type.StyleChange,
+            QEvent.Type.PolishRequest,
+        }:
+            self.fit()
+        return False
 
 
 class DropZone(QFrame):
