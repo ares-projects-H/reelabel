@@ -1,5 +1,7 @@
 """Folder drops use the actual advertised widgets, not a manually emitted signal."""
 
+from pathlib import Path
+
 import pytest
 from PySide6.QtCore import QMimeData, QPoint, QPointF, QSettings, Qt, QUrl
 from PySide6.QtGui import QDragEnterEvent, QDragLeaveEvent, QDragMoveEvent, QDropEvent
@@ -74,7 +76,7 @@ def test_every_advertised_drop_area_selects_without_scanning(window, tmp_path, t
     event = drop(target, mime, point)
     assert event.isAccepted()
     assert event.dropAction() == Qt.DropAction.CopyAction
-    assert window.path_edit.text() == str(folder)
+    assert Path(window.path_edit.text()) == folder
     assert zone.property("dragging") is False
     assert window._scan_thread is None
     assert window.current_report is None

@@ -88,7 +88,8 @@ class PackageSmokeTest(QObject):
                 )
                 QApplication.sendEvent(target, drop)
                 require(drop.isAccepted(), "Welcome area rejected the folder drop")
-                require(self.window.path_edit.text() == str(media), "Drop did not select folder")
+                # Qt's local-file URLs use forward slashes even on Windows.
+                require(Path(self.window.path_edit.text()) == media, "Drop did not select folder")
                 require(self.window._scan_thread is None, "Drop unexpectedly started scanning")
                 self.window.scan_button.click()
                 self.stage = "scan"
