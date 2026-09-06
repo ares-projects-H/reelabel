@@ -9,6 +9,7 @@ from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import QApplication
 
 from .assets import project_asset
+from .components import combo_text_width
 from .settings import SettingsDialog
 
 
@@ -92,8 +93,14 @@ class PackageSmokeTest(QObject):
                 dialog = QApplication.activeModalWidget()
                 require(isinstance(dialog, SettingsDialog), "Settings closed unexpectedly")
                 require(
-                    dialog.media_scope.width() >= dialog.media_scope.minimumSizeHint().width(),
-                    f"Media choices do not fit: width={dialog.media_scope.width()}, minimum={dialog.media_scope.minimumSizeHint().width()}, font={dialog.media_scope.font().toString()}",
+                    combo_text_width(dialog.media_scope)
+                    >= max(
+                        dialog.media_scope.fontMetrics().horizontalAdvance(
+                            dialog.media_scope.itemText(i)
+                        )
+                        for i in range(dialog.media_scope.count())
+                    ),
+                    f"Media choices do not fit: label space={combo_text_width(dialog.media_scope)}, font={dialog.media_scope.font().toString()}",
                 )
                 dialog.reject()
                 self.stage = "done"

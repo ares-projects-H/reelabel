@@ -6,7 +6,16 @@ from pathlib import Path
 
 from PySide6.QtCore import QEvent, QObject, Qt, QTimer, Signal
 from PySide6.QtGui import QDragEnterEvent, QDropEvent
-from PySide6.QtWidgets import QComboBox, QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
+from PySide6.QtWidgets import (
+    QComboBox,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QStyle,
+    QStyleOptionComboBox,
+    QVBoxLayout,
+)
 
 
 def label(text: str, role: str = "", wrap: bool = False) -> QLabel:
@@ -60,6 +69,19 @@ def fit_combo(combo: QComboBox) -> None:
     fitter.fit()
 
 
+def combo_text_width(combo: QComboBox) -> int:
+    """Return the real label rectangle after borders, padding and the arrow."""
+    option = QStyleOptionComboBox()
+    combo.initStyleOption(option)
+    return (
+        combo.style()
+        .subControlRect(
+            QStyle.ComplexControl.CC_ComboBox, option, QStyle.SubControl.SC_ComboBoxEditField, combo
+        )
+        .width()
+    )
+
+
 class _ComboFitter(QObject):
     def __init__(self, combo):
         super().__init__(combo)
@@ -79,7 +101,12 @@ class _ComboFitter(QObject):
                 combo.fontMetrics().horizontalAdvance(combo.itemText(i))
                 for i in range(combo.count())
             )
-            combo.setFixedWidth(max(168, widest + 48, combo.minimumSizeHint().width()))
+            # QSS uses 22 px padding + a 26 px arrow + borders. Keep a small
+            # text margin, then account for any extra platform decoration.
+            combo.setFixedWidth(max(168, widest + 56))
+            shortfall = widest + 8 - combo_text_width(combo)
+            if shortfall > 0:
+                combo.setFixedWidth(combo.width() + shortfall)
             combo.view().setMinimumWidth(max(200, widest + 64))
         finally:
             self.fitting = False

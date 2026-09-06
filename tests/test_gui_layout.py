@@ -4,6 +4,7 @@ import pytest
 from PySide6.QtCore import QPoint, QSettings, Qt
 from PySide6.QtWidgets import QApplication, QDialogButtonBox, QLineEdit
 
+from reelabel.gui.components import combo_text_width
 from reelabel.gui.main_window import MainWindow
 from reelabel.gui.settings import SettingsDialog, SettingsValues
 
@@ -13,14 +14,14 @@ def test_combo_refits_after_final_font_and_style_change(qtbot, pixels):
     dialog = SettingsDialog(SettingsValues())
     qtbot.addWidget(dialog)
     combo = dialog.media_scope
-    combo.setStyleSheet(f"QComboBox {{ font-size: {pixels}px; }}")
+    combo.setStyleSheet(f"QComboBox {{ font-size: {pixels}px; padding: 8px 28px; }}")
     dialog.show()
     qtbot.wait(10)
     widest = max(
         combo.fontMetrics().horizontalAdvance(combo.itemText(i)) for i in range(combo.count())
     )
     assert combo.width() >= widest + 48
-    assert combo.width() >= combo.minimumSizeHint().width()
+    assert combo_text_width(combo) >= widest
     assert combo.view().minimumWidth() >= widest + 64
 
 
