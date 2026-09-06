@@ -6,45 +6,27 @@ from dataclasses import dataclass
 
 from PySide6.QtCore import QSettings, Signal
 from PySide6.QtWidgets import (
+    QButtonGroup,
     QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
-    QGridLayout,
     QHBoxLayout,
-    QLabel,
     QPushButton,
-    QSizePolicy,
+    QScrollArea,
     QVBoxLayout,
     QWidget,
 )
 
 from reelabel._version import __version__
 
+from .components import card, fit_combo, label, row
+
 APPEARANCE_KEY = "appearance/theme"
 MEDIA_SCOPE_KEY = "scan/default_media_scope"
 RECURSIVE_KEY = "scan/default_include_subfolders"
 EXTRAS_KEY = "scan/default_include_extras"
 APPLY_CONFIRMATION_KEY = "confirmations/show_before_apply"
-
-
-def _fit_combo_to_items(combo: QComboBox) -> None:
-    """Keep the control compact while showing every popup label in full."""
-
-    if combo.count() == 0:
-        return
-    widest_label = max(
-        combo.fontMetrics().horizontalAdvance(combo.itemText(index))
-        for index in range(combo.count())
-    )
-    # The closed control stays compact in the two-column settings layout. The
-    # popup may be slightly wider so its labels never need an ellipsis.
-    control_width = max(160, widest_label + 48)
-    popup_width = max(200, widest_label + 64)
-    combo.setMinimumWidth(control_width)
-    combo.view().setMinimumWidth(popup_width)
-    combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-    combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
 
 
 @dataclass(frozen=True)
@@ -92,9 +74,10 @@ def save_settings(store: QSettings, values: SettingsValues) -> None:
 
 
 class SettingsDialog(QDialog):
-    """Small settings screen shared by macOS, Windows, and Linux."""
+    """Scrollable preferences with bounded controls and a live, reversible theme preview."""
 
     check_updates_requested = Signal()
+    appearance_preview = Signal(str)
 
     def __init__(
         self,
@@ -106,161 +89,134 @@ class SettingsDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Reelabel Settings")
         self.setModal(True)
-        # Keep every section readable at default display scaling on all three
-        # platforms. The compact two-column controls avoid a needlessly wide
-        # dialog, while the minimum height prevents wrapped privacy text from
-        # colliding with the scan checkboxes.
-        self.setMinimumSize(560, 680)
-
+        self.setMinimumSize(550, 420)
+        self.resize(680, min(800, self.screen().availableGeometry().height() - 80))
         page = QVBoxLayout(self)
-        page.setContentsMargins(24, 22, 24, 20)
-        page.setSpacing(18)
-
-        heading = QLabel("Application settings")
-        heading.setObjectName("dialogTitle")
-        explanation = QLabel(
-            "These preferences are stored only on this computer. "
-            "Reelabel does not send settings or filenames anywhere."
+        page.setContentsMargins(24, 24, 24, 20)
+        page.setSpacing(16)
+        page.addWidget(label("Settings", "heading"))
+        page.addWidget(
+            label(
+                "Preferences stay on this computer. Filenames are never sent anywhere.",
+                "muted",
+                True,
+            )
         )
-        explanation.setObjectName("muted")
-        explanation.setWordWrap(True)
-        page.addWidget(heading)
-        page.addWidget(explanation)
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        body = QWidget()
+        groups = QVBoxLayout(body)
+        groups.setContentsMargins(0, 0, 0, 0)
+        groups.setSpacing(14)
 
-        scan_heading = QLabel("Scan defaults")
-        scan_heading.setObjectName("sectionTitle")
-        page.addWidget(scan_heading)
+        appearance, layout = card()
+        layout.addWidget(label("Appearance", "strong"))
+        layout.addWidget(label("Choose how Reelabel looks.", "muted"))
+        self.appearance_group = QButtonGroup(self)
+        self.appearance_group.setExclusive(True)
+        choices = QHBoxLayout()
+        self.appearance_buttons = {}
+        for value in ("system", "light", "dark"):
+            choice = QPushButton(value.title())
+            choice.setObjectName("segment")
+            choice.setProperty("value", value)
+            choice.setCheckable(True)
+            choice.setChecked(values.appearance == value)
+            self.appearance_group.addButton(choice)
+            self.appearance_buttons[value] = choice
+            choices.addWidget(choice, 1)
+        self.appearance_group.buttonToggled.connect(
+            lambda b, checked: (
+                self.appearance_preview.emit(b.property("value")) if checked else None
+            )
+        )
+        layout.addLayout(choices)
+        groups.addWidget(appearance)
 
-        scan_defaults = QVBoxLayout()
-        scan_defaults.setSpacing(8)
-        choices = QGridLayout()
-        choices.setHorizontalSpacing(12)
-        choices.setVerticalSpacing(6)
-        choices.setColumnStretch(0, 1)
-        choices.setColumnStretch(1, 1)
-
-        appearance_label = QLabel("Appearance")
-        self.appearance = QComboBox()
-        self.appearance.addItem("System default", "system")
-        self.appearance.addItem("Light", "light")
-        self.appearance.addItem("Dark", "dark")
-        self.appearance.setCurrentIndex(max(0, self.appearance.findData(values.appearance)))
-        _fit_combo_to_items(self.appearance)
-
-        media_scope_label = QLabel("Default media type")
+        defaults, layout = card()
+        layout.addWidget(label("Scan defaults", "strong"))
         self.media_scope = QComboBox()
-        self.media_scope.addItem("All media", "all")
-        self.media_scope.addItem("Movies only", "movies")
-        self.media_scope.addItem("Series only", "series")
+        self.media_scope.setAccessibleName("Default media type")
+        for text, value in (
+            ("All media", "all"),
+            ("Movies only", "movies"),
+            ("Series only", "series"),
+        ):
+            self.media_scope.addItem(text, value)
         self.media_scope.setCurrentIndex(max(0, self.media_scope.findData(values.media_scope)))
-        _fit_combo_to_items(self.media_scope)
-        choices.addWidget(appearance_label, 0, 0)
-        choices.addWidget(media_scope_label, 0, 1)
-        choices.addWidget(self.appearance, 1, 0)
-        choices.addWidget(self.media_scope, 1, 1)
-        scan_defaults.addLayout(choices)
-
-        self.recursive = QCheckBox("Include subfolders by default")
+        fit_combo(self.media_scope)
+        layout.addLayout(row(label("Media type"), None, self.media_scope))
+        self.recursive = QCheckBox("Include subfolders")
         self.recursive.setChecked(values.recursive)
-        scan_defaults.addWidget(self.recursive)
-
-        self.include_extras = QCheckBox("Include extras by default")
+        self.include_extras = QCheckBox("Include extras, trailers and bonus files")
         self.include_extras.setChecked(values.include_extras)
-        scan_defaults.addWidget(self.include_extras)
-        page.addLayout(scan_defaults)
+        layout.addWidget(self.recursive)
+        layout.addWidget(self.include_extras)
+        groups.addWidget(defaults)
 
-        confirmation_heading = QLabel("Confirmations")
-        confirmation_heading.setObjectName("sectionTitle")
-        page.addWidget(confirmation_heading)
-
-        confirmation_options = QVBoxLayout()
-        confirmation_options.setSpacing(4)
-        self.apply_confirmation = QCheckBox(
-            "Show confirmation before applying selected changes"
-        )
+        safety, layout = card()
+        layout.addWidget(label("Before applying changes", "strong"))
+        self.apply_confirmation = QCheckBox("Show a confirmation before renaming")
         self.apply_confirmation.setChecked(values.show_apply_confirmation)
         self.apply_confirmation.setToolTip(
             "Re-enable this after choosing Don't show again in the Apply dialog."
         )
-        confirmation_hint = QLabel(
-            "Destination checks, automatic restoration, and History / Undo "
-            "remain active even when this confirmation is hidden."
+        layout.addWidget(self.apply_confirmation)
+        layout.addWidget(
+            label(
+                "Destination checks, automatic restoration and History / Undo always stay active. "
+                "Images/NFO stay unchecked; permanent deletion always needs a separate confirmation.",
+                "muted",
+                True,
+            )
         )
-        confirmation_hint.setObjectName("muted")
-        confirmation_hint.setWordWrap(True)
-        confirmation_options.addWidget(self.apply_confirmation)
-        confirmation_options.addWidget(confirmation_hint)
-        page.addLayout(confirmation_options)
+        groups.addWidget(safety)
 
-        updates_heading = QLabel("Updates")
-        updates_heading.setObjectName("sectionTitle")
-        page.addWidget(updates_heading)
-
-        updates_row = QHBoxLayout()
-        updates_text = QVBoxLayout()
-        self.current_version = QLabel(f"Installed version: {app_version}")
-        update_privacy = QLabel(
-            "Reelabel connects to GitHub only when you click this button. "
-            "It never downloads or installs an update automatically."
+        updates_card, layout = card()
+        self.current_version = label(f"Installed version: {app_version}", "muted")
+        layout.addLayout(row(label("Updates", "strong"), None, self.current_version))
+        layout.addWidget(
+            label(
+                "Reelabel connects to GitHub only when you click this button. "
+                "It never downloads or installs an update automatically.",
+                "muted",
+                True,
+            )
         )
-        update_privacy.setObjectName("muted")
-        update_privacy.setWordWrap(True)
-        updates_text.addWidget(self.current_version)
-        updates_text.addWidget(update_privacy)
-        updates_row.addLayout(updates_text, 1)
         self.check_updates_button = QPushButton("Check for updates")
         self.check_updates_button.clicked.connect(self.check_updates_requested.emit)
-        updates_row.addWidget(self.check_updates_button)
-        page.addLayout(updates_row)
-
-        self.update_status = QLabel("")
-        self.update_status.setObjectName("muted")
-        self.update_status.setWordWrap(True)
-        self.update_status.setVisible(False)
-        page.addWidget(self.update_status)
-
-        safety_note = QLabel(
-            "Related images and NFO files remain disabled and unchecked by "
-            "default. Their separate permanent-deletion confirmation cannot "
-            "be disabled."
-        )
-        safety_note.setObjectName("safeNotice")
-        safety_note.setWordWrap(True)
-        page.addWidget(safety_note)
+        layout.addLayout(row(self.check_updates_button, None))
+        self.update_status = label("", "muted", True)
+        self.update_status.hide()
+        layout.addWidget(self.update_status)
+        groups.addWidget(updates_card)
+        groups.addStretch()
+        self.scroll.setWidget(body)
+        page.addWidget(self.scroll, 1)
 
         buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Save
-            | QDialogButtonBox.StandardButton.Cancel
+            QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
         )
-        save_button = buttons.button(QDialogButtonBox.StandardButton.Save)
-        if save_button is not None:
-            save_button.setObjectName("primary")
+        buttons.button(QDialogButtonBox.StandardButton.Save).setObjectName("primary")
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
-        page.addWidget(buttons)
+        page.addLayout(row(label("Save to keep your changes.", "muted"), None, buttons))
 
     def set_update_checking(self, checking: bool) -> None:
-        """Keep the manual update control clear while its worker is running."""
-
         self.check_updates_button.setEnabled(not checking)
-        self.check_updates_button.setText(
-            "Checking…" if checking else "Check for updates"
-        )
+        self.check_updates_button.setText("Checking…" if checking else "Check for updates")
         if checking:
-            self.update_status.setText("Contacting the official GitHub release page…")
-            self.update_status.setVisible(True)
+            self.set_update_status("Contacting the official GitHub release page…")
 
     def set_update_status(self, text: str) -> None:
-        """Show a concise result without changing any saved preference."""
-
+        """Keep feedback reachable even on a small display."""
         self.update_status.setText(text)
-        self.update_status.setVisible(True)
+        self.update_status.show()
+        self.scroll.ensureWidgetVisible(self.update_status)
 
     def values(self) -> SettingsValues:
-        """Return the selections currently displayed by the dialog."""
-
         return SettingsValues(
-            appearance=str(self.appearance.currentData()),
+            appearance=self.appearance_group.checkedButton().property("value"),
             media_scope=str(self.media_scope.currentData()),
             recursive=self.recursive.isChecked(),
             include_extras=self.include_extras.isChecked(),

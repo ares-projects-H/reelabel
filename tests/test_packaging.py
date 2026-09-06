@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 import tomllib
@@ -22,9 +25,9 @@ def test_public_version_is_consistent() -> None:
     assert "reelabel" in project["project"]["scripts"]
     assert "reelabel-gui" in project["project"]["scripts"]
     assert reelabel.__version__ == "0.2.0"
-    assert f"# Reelabel v{reelabel.__version__}" in (
-        PROJECT_ROOT / "RELEASE_NOTES.md"
-    ).read_text(encoding="utf-8")
+    assert f"# Reelabel v{reelabel.__version__}" in (PROJECT_ROOT / "RELEASE_NOTES.md").read_text(
+        encoding="utf-8"
+    )
     assert "#error MyAppVersion must be provided" in (
         PROJECT_ROOT / "packaging" / "windows" / "Reelabel.iss"
     ).read_text(encoding="utf-8")
@@ -41,6 +44,46 @@ def test_native_icons_have_expected_headers() -> None:
     macos_icon = (PROJECT_ROOT / "assets" / "reelabel-icon.icns").read_bytes()
     assert windows_icon[:4] == b"\x00\x00\x01\x00"
     assert macos_icon[:4] == b"icns"
+
+
+def test_optimized_package_smoke_runs_the_scan_and_settings():
+    result = subprocess.run(
+        [sys.executable, "-O", "-m", "reelabel.gui.app"],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        env={
+            **os.environ,
+            "QT_QPA_PLATFORM": "offscreen",
+            "REELABEL_SMOKE_TEST": "1",
+            "REELABEL_SMOKE_TEST_SETTINGS": "1",
+        },
+    )
+    assert result.returncode == 0, result.stderr
+    assert "Reelabel package smoke: passed" in result.stderr
+
+
+def test_smoke_checks_are_not_removed_by_optimization():
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-O",
+            "-c",
+            "from reelabel.gui.smoke import require; require(False, 'missing asset')",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode != 0
+    assert "missing asset" in result.stderr
+
+
+def test_interface_svgs_are_included_in_installers():
+    spec = (PROJECT_ROOT / "packaging" / "reelabel.spec").read_text()
+    assert '(str(ASSETS / "ui"), "assets/ui")' in spec
+    for theme in ("light", "dark"):
+        for glyph in ("check", "chevron"):
+            assert (PROJECT_ROOT / "assets" / "ui" / f"{glyph}-{theme}.svg").is_file()
 
 
 def test_macos_dmg_requires_dragging_to_applications() -> None:

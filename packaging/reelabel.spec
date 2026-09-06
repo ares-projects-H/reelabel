@@ -25,6 +25,7 @@ a = Analysis(
     binaries=[],
     datas=[
         (str(ASSETS / "reelabel-icon.png"), "assets"),
+        (str(ASSETS / "ui"), "assets/ui"),
         # Ship the complete MIT text with every packaged application.
         (str(PROJECT_ROOT / "LICENSE"), "."),
     ],

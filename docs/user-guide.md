@@ -7,7 +7,8 @@ For your first test, use a copied media folder rather than your only copy.
 
 ## Menus and Settings
 
-On macOS, open **Reelabel → Settings…** in the menu bar at the top of the
+Click **Settings** at the top of the window. On macOS, you can also open
+**Reelabel → Preferences…** in the menu bar at the top of the
 screen. **About Reelabel** and **Quit Reelabel** are in the same application
 menu.
 
@@ -17,7 +18,7 @@ On Windows and Linux, open **File → Settings…** in the Reelabel window.
 
 Settings can remember:
 
-- System default, Light, or Dark appearance;
+- System, Light, or Dark appearance (previewed immediately; Cancel restores the saved choice);
 - the default media type;
 - whether new previews include subfolders;
 - whether new previews include extras.
@@ -30,7 +31,8 @@ button. GitHub is contacted only after you click that button.
 
 ## 1. Choose a folder
 
-Drag one folder onto the drop area, or choose **Browse**. Reelabel will show a
+Drag one folder onto the source panel, or choose **Choose folder** (then
+**Change folder** if one is already selected). Reelabel will show a
 warning if you click **Preview changes** without first choosing a folder.
 
 The scan options are:
@@ -39,28 +41,33 @@ The scan options are:
 - **Movies only**: ignore recognized series.
 - **Series only**: ignore recognized movies.
 - **Include subfolders**: scan inside folders below the selected folder.
-- **Include extras**: include recognized trailers, samples, and other extras.
+- Under **More options**, **Include extras, trailers and bonus files** includes recognized extras.
 
 Choosing a folder and previewing it does not rename anything.
+Changing the folder or scan options clears the old preview and disables Apply.
+Run **Preview changes** again before renaming anything.
 
 ## 2. Read the preview
 
 Each row contains:
 
 - **Include**: checked rows will be included if you apply the preview.
-- **Status**: `Ready`, `Review`, `Ignored`, or `Related`.
+- **Status**: `Ready`, `Review`, or `Ignored`. Related images/NFO have a separate list.
 - **Original name**: the current filename or folder name.
 - **Proposed name**: Reelabel's editable suggestion.
 - **Type**: the file type, such as MKV, SRT, ASS, or FOLDER.
 
 Use the `All`, `Ready`, `Review`, and `Ignored` buttons to filter the rows.
+Type part of a current or proposed filename in **Find a filename…** to narrow the list.
+Filtering does not uncheck hidden rows: the footer reports selected changes outside
+the current filter. Clear the filters to review your complete selection before applying.
 Drag a divider between column headings to change a column's width. Click a text
 column heading once for ascending order and again for descending order.
 
 ## 3. Review and edit suggestions
 
 Double-click a cell in the **Proposed name** column to edit it, then press
-Enter.
+Enter. You can also select a row and click **Edit name**, or press F2.
 
 When you correct a series title or season pattern, Reelabel can offer to update
 the other episodes in that folder while keeping their episode numbers. When you
@@ -79,8 +86,7 @@ destinations, case collisions, and extension changes.
 Uncheck any row you do not want to apply. Choose **Apply selected changes**,
 read the confirmation, and approve it only if the counts are correct. Select
 **Don't show again** if you no longer need this rename reminder.
-You can restore it later with **Show confirmation before applying selected
-changes** in Reelabel Settings.
+You can restore it later with **Show a confirmation before renaming** in Reelabel Settings.
 
 Reelabel applies a validated group of renames as one operation. If part of the
 operation fails, it restores items already moved instead of leaving a partial
@@ -91,14 +97,14 @@ when the rename confirmation is hidden.
 
 Every successful operation creates a History / Undo entry in Reelabel's
 application-data folder. Open **History / Undo**, select an available entry,
-and restore it. **Undo selected** remains disabled until a restorable entry is
+and choose **Restore original names**. The button remains disabled until a restorable entry is
 selected.
 
 Undo refuses to overwrite a file that appeared after the original operation.
 
 ## Related images and NFO files
 
-**Show related images / NFO** is off by default. When enabled, related files
+Under **More options**, **Find related images / NFO** is off by default. When enabled, related files
 appear separately and remain unchecked. Deleting selected related files
 requires a second confirmation, with **Cancel** as its default action.
 

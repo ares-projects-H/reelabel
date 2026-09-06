@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import os
 import sys
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QSettings
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
 from .main_window import MainWindow, project_asset
+from .smoke import PackageSmokeTest
 
 
 def main() -> int:
@@ -23,7 +26,17 @@ def main() -> int:
     icon = QIcon(str(project_asset("reelabel-icon.png")))
     if not icon.isNull():
         application.setWindowIcon(icon)
-    window = MainWindow(demo=False)
+    smoke_root = (
+        TemporaryDirectory(prefix="reelabel-package-smoke-")
+        if os.environ.get("REELABEL_SMOKE_TEST") == "1"
+        else None
+    )
+    settings = (
+        QSettings(str(Path(smoke_root.name) / "settings.ini"), QSettings.Format.IniFormat)
+        if smoke_root
+        else None
+    )
+    window = MainWindow(demo=False, settings_store=settings)
     window.show()
     # On macOS the Dock icon is owned by the native QWindow. It exists only
     # after show(), so set it here as well as on QApplication.
@@ -31,13 +44,18 @@ def main() -> int:
         window.windowHandle().setIcon(icon)
     # Package workflows use this local-only switch to verify that the bundled
     # GUI starts without Python being installed on the target system.
-    if os.environ.get("REELABEL_SMOKE_TEST") == "1":
-        # Installer builds additionally open Settings so missing Qt modules or
-        # platform-specific menu wiring fail before an artifact is published.
-        if os.environ.get("REELABEL_SMOKE_TEST_SETTINGS") == "1":
-            QTimer.singleShot(0, window.settings_action.trigger)
-        QTimer.singleShot(1000, application.quit)
-    return application.exec()
+    if smoke_root:
+        smoke = PackageSmokeTest(
+            application,
+            window,
+            Path(smoke_root.name),
+            os.environ.get("REELABEL_SMOKE_TEST_SETTINGS") == "1",
+        )
+        smoke.start()
+    result = application.exec()
+    if smoke_root:
+        smoke_root.cleanup()
+    return result
 
 
 if __name__ == "__main__":

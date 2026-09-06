@@ -31,6 +31,52 @@ def test_windows_reserved_name_is_rejected_on_every_platform(tmp_path: Path) -> 
     assert any("reserved by Windows" in issue.message for issue in issues)
 
 
+@pytest.mark.parametrize("name", ["../escape.mkv", "/absolute.mkv", "sub/film.mkv", "bad\x00.mkv", "CON.fr.mkv"])
+def test_invalid_manual_names_report_issues_instead_of_raising(tmp_path, name):
+    source = _movie(tmp_path)
+    report = api.scan(api.ScanOptions(tmp_path))
+    assert api.validate_edits(report, {source: name})
+    assert source.exists()
+
+
+def test_validation_indexes_each_directory_once_and_refreshes_next_call(tmp_path, monkeypatch):
+    sources = [_movie(tmp_path, f"Demo Film {i}.2025.1080p.mkv") for i in range(20)]
+    report = api.scan(api.ScanOptions(tmp_path, recursive=False))
+    edits = {source: f"Renamed {i}.mkv" for i, source in enumerate(sources)}
+    original = Path.iterdir
+    calls = []
+
+    def counted(path):
+        calls.append(path)
+        return original(path)
+
+    monkeypatch.setattr(Path, "iterdir", counted)
+    assert not api.validate_edits(report, edits)
+    assert calls.count(tmp_path) == 1
+    (tmp_path / "RENAMED 0.MKV").touch()
+    assert api.validate_edits(report, edits)
+    assert calls.count(tmp_path) == 2
+
+
+def test_scan_collision_pass_uses_a_fresh_directory_index(tmp_path, monkeypatch):
+    sources = [_movie(tmp_path, f"Demo Film {i}.2025.1080p.mkv") for i in range(20)]
+    original = Path.iterdir
+    calls = []
+
+    def counted(path):
+        calls.append(path)
+        return original(path)
+
+    monkeypatch.setattr(Path, "iterdir", counted)
+    report = core.Report(renames=[core.Rename(source, tmp_path / f"Renamed {i}.mkv", "test") for i, source in enumerate(sources)])
+    core._mark_conflicts(report)
+    assert calls.count(tmp_path) == 1
+    (tmp_path / "RENAMED 0.MKV").touch()
+    core._mark_conflicts(report)
+    assert calls.count(tmp_path) == 2
+    assert report.renames[0].status == "conflict"
+
+
 def test_duplicate_destination_is_rejected_case_insensitively(tmp_path: Path) -> None:
     first = _movie(tmp_path, "Glass Meridian.2007.DVDRip.mkv")
     second = _movie(tmp_path, "Another.Movie.2008.DVDRip.mkv")

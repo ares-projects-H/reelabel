@@ -698,6 +698,8 @@ def _mark_conflicts(report: Report) -> None:
     active = [r for r in report.renames if r.status == "proposed"]
     sources = {r.source.resolve() for r in active}
     destinations: dict[str, list[Rename]] = defaultdict(list)
+    # Local to this pass: do not carry directory state from Preview to Apply.
+    siblings_by_parent: dict[Path, dict[str, list[Path]]] = {}
     for rename in active:
         destinations[str(rename.destination.resolve()).casefold()].append(rename)
     for same_destination in destinations.values():
@@ -711,7 +713,16 @@ def _mark_conflicts(report: Report) -> None:
     for rename in active:
         if rename.status != "proposed":
             continue
-        sibling_case_collision = any(p.name.casefold() == rename.destination.name.casefold() and p.resolve() not in sources for p in rename.destination.parent.iterdir())
+        parent = rename.destination.parent
+        if parent not in siblings_by_parent:
+            entries: dict[str, list[Path]] = defaultdict(list)
+            for sibling in parent.iterdir():
+                entries[sibling.name.casefold()].append(sibling)
+            siblings_by_parent[parent] = entries
+        sibling_case_collision = any(
+            sibling.resolve() not in sources
+            for sibling in siblings_by_parent[parent].get(rename.destination.name.casefold(), ())
+        )
         if rename.destination.exists() and rename.destination.resolve() not in sources or sibling_case_collision:
             rename.status, rename.detail = (
                 "conflict",
