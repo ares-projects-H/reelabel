@@ -16,7 +16,7 @@ refuses ambiguous or conflicting operations.
 
 > Current release: v0.2.0.
 > The installers are unsigned, so begin with a copied test folder.
-> This branch previews a redesigned interface; its test builds are not a new public release.
+> This branch previews the redesigned **0.3.0** interface; its test builds are not yet a public release.
 
 ## Interface preview
 
@@ -70,7 +70,8 @@ publisher signing without claiming that it is active today.
 ## First use in eight steps
 
 1. Open Reelabel.
-2. Drag a media folder into the window, or click **Choose folder**.
+2. Drop a media folder anywhere inside the outlined welcome area (or onto the
+   source panel at the top), or click **Choose folder**.
 3. Choose **All media**, **Movies only**, or **Series only**.
 4. Click **Preview changes**. No files are changed during this step.
 5. Review every row. Uncheck anything you do not want to rename.

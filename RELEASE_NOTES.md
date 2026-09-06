@@ -1,3 +1,30 @@
+# Reelabel v0.3.0
+
+Test candidate — not yet published. The latest public release remains v0.2.0.
+
+## Highlights
+
+- A compact redesigned workspace with clearer light, dark and system appearance.
+- Drop a folder anywhere in the outlined welcome area, including over its text
+  or button; a highlighted outline confirms the target. The top source panel
+  also accepts folders. A drop selects a folder without changing its contents.
+- Filename search, explicit Edit name/F2, and readable, resizable preview columns.
+- Scrollable Settings, clearer History / Undo and consistent confirmation dialogs.
+- Stale previews cleared when sources/options change; background Apply/Undo with
+  safe shutdown, while preserving no-overwrite, rollback and deletion protections.
+- More focused GUI modules and faster per-pass collision checks.
+
+## Test packages
+
+- **Windows 10/11 x64:** `Reelabel-0.3.0-Windows-x64-Setup.exe`
+- **macOS Apple Silicon:** `Reelabel-0.3.0-macOS-arm64.dmg`
+- **macOS Intel:** `Reelabel-0.3.0-macOS-x86_64.dmg`
+- **Ubuntu 24.04 x86_64:** `Reelabel-0.3.0-Ubuntu-24.04-x86_64.deb`
+- **Other Linux x86_64:** `Reelabel-0.3.0-Linux-x86_64.AppImage`
+
+Test installers remain unsigned. Verify their SHA-256 checksums and GitHub build
+attestations. Manual validation is required before merge or publication.
+
 # Reelabel v0.2.0
 
 Second feature release of the privacy-focused Reelabel desktop application.

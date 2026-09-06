@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import QEvent, QObject, Qt, QTimer, Signal
-from PySide6.QtGui import QDragEnterEvent, QDropEvent
+from PySide6.QtGui import QDragEnterEvent, QDragMoveEvent, QDropEvent
 from PySide6.QtWidgets import (
     QComboBox,
     QFrame,
@@ -126,7 +126,7 @@ class _ComboFitter(QObject):
 
 
 class DropZone(QFrame):
-    """A compact source panel that accepts exactly one local directory."""
+    """A visible folder-selection target, shared by the source and welcome panels."""
 
     folder_dropped = Signal(str)
 
@@ -137,6 +137,11 @@ class DropZone(QFrame):
         self.setAccessibleName("Media folder; drop one local folder here")
 
     def _folder(self, event) -> str | None:
+        if not self.isEnabled() or not self.acceptDrops():
+            return None
+        # Selecting a folder must never advertise a move to Finder/Explorer.
+        if not event.possibleActions() & Qt.DropAction.CopyAction:
+            return None
         urls = event.mimeData().urls()
         if len(urls) == 1 and urls[0].isLocalFile():
             folder = urls[0].toLocalFile()
@@ -145,14 +150,32 @@ class DropZone(QFrame):
         return None
 
     def _highlight(self, active: bool) -> None:
+        if self.property("dragging") == active:
+            return
         self.setProperty("dragging", active)
         self.style().unpolish(self)
         self.style().polish(self)
+        self.update()
+
+    def setAcceptDrops(self, enabled: bool) -> None:  # noqa: N802
+        super().setAcceptDrops(enabled)
+        if not enabled:
+            self._highlight(False)
+
+    def _accept_folder_drag(self, event) -> None:
+        accepted = bool(self._folder(event))
+        self._highlight(accepted)
+        if accepted:
+            event.setDropAction(Qt.DropAction.CopyAction)
+            event.accept()
+        else:
+            event.ignore()
 
     def dragEnterEvent(self, event: QDragEnterEvent) -> None:  # noqa: N802
-        if self.isEnabled() and self._folder(event):
-            self._highlight(True)
-            event.acceptProposedAction()
+        self._accept_folder_drag(event)
+
+    def dragMoveEvent(self, event: QDragMoveEvent) -> None:  # noqa: N802
+        self._accept_folder_drag(event)
 
     def dragLeaveEvent(self, event) -> None:  # noqa: N802
         self._highlight(False)
@@ -162,9 +185,12 @@ class DropZone(QFrame):
         self._highlight(False)
         folder = self._folder(event)
         # Recheck at drop time, not only during dragEnter: the folder may vanish.
-        if self.isEnabled() and folder:
+        if folder:
             self.folder_dropped.emit(folder)
-            event.acceptProposedAction()
+            event.setDropAction(Qt.DropAction.CopyAction)
+            event.accept()
+        else:
+            event.ignore()
 
 
 class ElidedLabel(QLabel):

@@ -24,7 +24,7 @@ def test_public_version_is_consistent() -> None:
     assert project["project"]["license"] == "MIT"
     assert "reelabel" in project["project"]["scripts"]
     assert "reelabel-gui" in project["project"]["scripts"]
-    assert reelabel.__version__ == "0.2.0"
+    assert reelabel.__version__ == "0.3.0"
     assert f"# Reelabel v{reelabel.__version__}" in (PROJECT_ROOT / "RELEASE_NOTES.md").read_text(
         encoding="utf-8"
     )

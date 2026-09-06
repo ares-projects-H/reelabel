@@ -72,7 +72,7 @@ class Workspace(QWidget):
         self.folder_title.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.path_edit = QLineEdit()
         self.path_edit.setObjectName("pathInput")
-        self.path_edit.setPlaceholderText("Choose or drop a local media folder")
+        self.path_edit.setPlaceholderText("Choose or drop a media folder here")
         self.path_edit.setAccessibleName("Selected media folder path")
         self.path_edit.setAcceptDrops(False)
         self.path_edit.textChanged.connect(self._folder_changed)
@@ -160,18 +160,25 @@ class Workspace(QWidget):
         self.stack = QStackedWidget()
         self.table = PreviewTable()
         self.stack.addWidget(self.table)
-        self.empty_page = QWidget()
+        # The entire outlined area is a real target, including the instructions
+        # and button. Children do not accept drops, so Qt routes them here.
+        self.empty_page = DropZone()
+        self.empty_page.setProperty("welcome", True)
         empty = QVBoxLayout(self.empty_page)
         empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.empty_title = label("Your next tidy library starts here.", "heading", True)
+        empty.setContentsMargins(24, 24, 24, 24)
+        empty.setSpacing(14)
+        self.empty_icon = QLabel()
+        self.empty_icon.setFixedSize(48, 48)
+        self.empty_title = label("Drop a media folder here", "heading", True)
         self.empty_hint = label(
-            "Choose or drop a media folder to see proposed names.", "muted", True
+            "Anywhere inside this outlined area. Your files stay unchanged.", "muted", True
         )
         for text in (self.empty_title, self.empty_hint):
             text.setAlignment(Qt.AlignmentFlag.AlignCenter)
             text.setMinimumWidth(440)
         self.empty_browse = button("Choose a media folder", "primary")
-        for item in (self.empty_title, self.empty_hint, self.empty_browse):
+        for item in (self.empty_icon, self.empty_title, self.empty_hint, self.empty_browse):
             empty.addWidget(item, 0, Qt.AlignmentFlag.AlignCenter)
         self.stack.addWidget(self.empty_page)
         self.no_results_page = QWidget()
@@ -247,6 +254,7 @@ class Workspace(QWidget):
     def set_theme(self, dark: bool) -> None:
         c = colors(dark)
         self.folder_icon.setPixmap(icon("folder", c["accent"]).pixmap(30, 30))
+        self.empty_icon.setPixmap(icon("folder", c["accent"]).pixmap(48, 48))
         for control, glyph in (
             (self.history_button, "history"),
             (self.settings_button, "settings"),
@@ -278,8 +286,10 @@ class Workspace(QWidget):
 
     def show_empty(self, title: str | None = None, hint: str | None = None) -> None:
         self.stack.setCurrentWidget(self.empty_page)
-        self.empty_title.setText(title or "Your next tidy library starts here.")
-        self.empty_hint.setText(hint or "Choose or drop a media folder to see proposed names.")
+        self.empty_title.setText(title or "Drop a media folder here")
+        self.empty_hint.setText(
+            hint or "Anywhere inside this outlined area. Your files stay unchanged."
+        )
         self.review_toolbar.hide()
         self.detail.hide()
         self.related_panel.hide()

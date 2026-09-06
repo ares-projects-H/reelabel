@@ -2,12 +2,16 @@
 
 Branch: `feature/modern-interface`, based on public v0.2.0 (`f85fde2`).
 The owner approved the direction in [Validation 1](README.md).
-This work is a test candidate, not a published release. It retains runtime version
-0.2.0; identify candidates by their commit and build-run manifest.
+This work is a **0.3.0 test candidate**, not a published release. Early interface
+builds displayed 0.2.0; the owner requested a distinct version after macOS validation.
+Use the version, commit and build-run manifest to identify the latest candidate.
 
 ## User-visible changes
 
 - Compact source panel, one row of filters, filename search, and a larger preview.
+- A clearly outlined welcome area accepts a folder anywhere inside it, including
+  over its instructions/button. It shares the source panel's validation and busy
+  lockout; a drop selects the folder without scanning or modifying it.
 - Explicit **Edit name** and F2, while preserving double-click editing and optional
   episode/subtitle propagation. Only proposed rename cells are editable.
 - Stable source-path identities under sorting, filtering, editing, and partial selection.
@@ -41,7 +45,7 @@ Codex skill has byte-identical API/engine sources, checked by tests.
 
 ## Reproducible verification
 
-Local result: **113 passed**, Ruff passed, `git diff --check` passed. The
+Local result: **129 passed**, Ruff passed, `git diff --check` passed. The
 layout checks also passed at each additional simulated scale (125%, 150%, 200%).
 The rebuilt local macOS executable passed the scan/assets/Settings package smoke.
 The initial Windows CI run caught construction-time dropdown font measurements.
@@ -109,3 +113,17 @@ not proof of native appearance, installer UX, FUSE availability, or OS warnings.
 Existing signatures, GitHub security settings, and Sponsors remain unchanged.
 
 No merge, tag, or public release is authorized by this implementation.
+
+## macOS feedback: welcome drop area and version
+
+After the owner validated the macOS interface, they reported that the central
+drop instructions did not match the active target (only the top panel accepted
+drops). The complete central outline now uses the same DropZone component.
+Sixteen new checks cover the center, labels, button, edge and top panel; Unicode
+paths; invalid/multiple/file/remote inputs; drag highlighting; busy lockout;
+disappearing folders; and compact light/dark geometry. No folder is moved or
+copied: the handler selects its path and reports a non-move drag action.
+
+Installer smoke now sends drag/drop events to the actual central widget, then
+scans and checks that Settings displays the package's single-source version.
+Version 0.3.0 distinguishes this candidate from the published 0.2.0 installers.

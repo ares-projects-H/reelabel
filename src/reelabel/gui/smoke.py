@@ -4,9 +4,12 @@ import sys
 import time
 from pathlib import Path
 
-from PySide6.QtCore import QObject, QTimer
+from PySide6.QtCore import QMimeData, QObject, QPointF, Qt, QTimer, QUrl
+from PySide6.QtGui import QDragEnterEvent, QDropEvent
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import QApplication
+
+from reelabel import __version__
 
 from .assets import project_asset
 from .components import combo_text_width
@@ -61,7 +64,32 @@ class PackageSmokeTest(QObject):
                 media = self.root / "Media"
                 media.mkdir()
                 (media / "Velora.Observatory.S01E01.1080p-DEMO.mkv").touch()
-                self.window.path_edit.setText(str(media))
+                # Exercise the advertised central target in the real bundle,
+                # rather than bypassing the drop handler by setting its path.
+                target = self.window.workspace.empty_page
+                require(target.isVisible(), "Welcome drop area is not visible")
+                mime = QMimeData()
+                mime.setUrls([QUrl.fromLocalFile(str(media))])
+                enter = QDragEnterEvent(
+                    target.rect().center(),
+                    Qt.DropAction.CopyAction,
+                    mime,
+                    Qt.MouseButton.LeftButton,
+                    Qt.KeyboardModifier.NoModifier,
+                )
+                QApplication.sendEvent(target, enter)
+                require(enter.isAccepted(), "Welcome area rejected the folder drag")
+                drop = QDropEvent(
+                    QPointF(target.rect().center()),
+                    Qt.DropAction.CopyAction,
+                    mime,
+                    Qt.MouseButton.LeftButton,
+                    Qt.KeyboardModifier.NoModifier,
+                )
+                QApplication.sendEvent(target, drop)
+                require(drop.isAccepted(), "Welcome area rejected the folder drop")
+                require(self.window.path_edit.text() == str(media), "Drop did not select folder")
+                require(self.window._scan_thread is None, "Drop unexpectedly started scanning")
                 self.window.scan_button.click()
                 self.stage = "scan"
             elif self.stage == "scan" and self.window._scan_thread is None:
@@ -80,6 +108,10 @@ class PackageSmokeTest(QObject):
                     return
                 require(isinstance(dialog, SettingsDialog), "Unexpected modal dialog")
                 require(dialog.isVisible(), "Settings did not open")
+                require(
+                    dialog.current_version.text() == f"Installed version: {__version__}",
+                    "Settings version does not match the package",
+                )
                 require(
                     set(dialog.appearance_buttons) == {"system", "light", "dark"},
                     "Missing appearance options",

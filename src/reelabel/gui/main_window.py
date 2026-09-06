@@ -245,6 +245,7 @@ class MainWindow(QMainWindow):
         self.workspace.history_button.clicked.connect(self._show_history)
         self.workspace.settings_button.clicked.connect(self._show_settings)
         self.drop_zone.folder_dropped.connect(self._set_folder)
+        self.workspace.empty_page.folder_dropped.connect(self._set_folder)
         self.scan_button.clicked.connect(self._scan_or_cancel)
         self.apply_button.clicked.connect(self._apply_selected)
         self.table.itemChanged.connect(self._table_item_changed)
@@ -571,12 +572,14 @@ class MainWindow(QMainWindow):
             self.extras,
             self.sidecars,
             self.workspace.browse_button,
+            self.workspace.empty_browse,
             self.workspace.history_button,
             self.history_action,
             self.choose_folder_action,
         ):
             control.setEnabled(enabled)
         self.drop_zone.setAcceptDrops(enabled)
+        self.workspace.empty_page.setAcceptDrops(enabled)
 
     def _populate_report(self, report: api.ScanReport) -> None:
         self._loading_table = True

@@ -113,7 +113,8 @@ def stylesheet(dark: bool = True) -> str:
     QLineEdit#pathInput {{ background: transparent; border-color: transparent; color: {c["muted"]}; padding: 2px 0; min-height: 18px; }}
     QLineEdit#pathInput:focus {{ border-bottom: 1px solid {c["accent"]}; }}
     QFrame#dropZone {{ background: {c["surface"]}; border: 1px solid {c["line"]}; border-radius: 12px; }}
-    QFrame#dropZone[dragging="true"] {{ border: 2px solid {c["accent"]}; }}
+    QFrame#dropZone[welcome="true"] {{ border: 2px dashed {c["divider"]}; background: {c["inset"]}; }}
+    QFrame#dropZone[dragging="true"] {{ border: 2px solid {c["accent"]}; background: {c["tint"]}; }}
     QPushButton#filter[active="true"] {{ background: {c["tint"]}; color: {c["ink"]}; border-color: {c["line"]}; }}
     QPushButton#danger {{ background: {c["danger"]}; color: {c["bg"]}; }}
     QMenu::item:disabled {{ color: {c["muted"]}; }}

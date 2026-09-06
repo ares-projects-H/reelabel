@@ -31,9 +31,13 @@ button. GitHub is contacted only after you click that button.
 
 ## 1. Choose a folder
 
-Drag one folder onto the source panel, or choose **Choose folder** (then
+Drop one folder anywhere inside the large outlined welcome area, including over
+its text or button. The outline highlights when a valid folder is dragged over it.
+You can also drop a folder onto the source panel at the top, or choose **Choose folder** (then
 **Change folder** if one is already selected). Reelabel will show a
 warning if you click **Preview changes** without first choosing a folder.
+Dropping a folder selects it only; click **Preview changes** to start the read-only
+scan. Individual files, multiple folders and web links are not accepted.
 
 The scan options are:
 
