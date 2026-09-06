@@ -65,8 +65,8 @@ jobs:
           $env:REELABEL_SMOKE_TEST = "1"
           $env:REELABEL_SMOKE_TEST_SETTINGS = "1"
           $env:QT_QPA_PLATFORM = "offscreen"
-          & ".\dist\Reelabel\Reelabel.exe"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $smoke = Start-Process -FilePath ".\dist\Reelabel\Reelabel.exe" -Wait -PassThru
+          if ($smoke.ExitCode -ne 0) { exit $smoke.ExitCode }
 
       - name: Install Inno Setup
         run: choco install innosetup --version=6.7.1 --no-progress -y

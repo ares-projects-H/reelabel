@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import QEvent, QObject, Qt, Signal
+from PySide6.QtCore import QEvent, QObject, Qt, QTimer, Signal
 from PySide6.QtGui import QDragEnterEvent, QDropEvent
 from PySide6.QtWidgets import QComboBox, QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
 
@@ -65,6 +65,9 @@ class _ComboFitter(QObject):
         super().__init__(combo)
         self.combo = combo
         self.fitting = False
+        self.timer = QTimer(self)
+        self.timer.setSingleShot(True)
+        self.timer.timeout.connect(self.fit)
 
     def fit(self):
         if self.fitting or not self.combo.count():
@@ -89,6 +92,9 @@ class _ComboFitter(QObject):
             QEvent.Type.PolishRequest,
         }:
             self.fit()
+            # Qt sends StyleChange before some platform size-hint caches have
+            # settled. Coalesce one follow-up after that event has completed.
+            self.timer.start(0)
         return False
 
 

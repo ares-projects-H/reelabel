@@ -85,9 +85,15 @@ class PackageSmokeTest(QObject):
                 )
                 for mode in ("light", "dark"):
                     dialog.appearance_buttons[mode].click()
+                self.stage = "settings_layout"
+            elif self.stage == "settings_layout":
+                # Measure the rendered result, after Qt processes font/style
+                # changes and the layout pass caused by the appearance buttons.
+                dialog = QApplication.activeModalWidget()
+                require(isinstance(dialog, SettingsDialog), "Settings closed unexpectedly")
                 require(
                     dialog.media_scope.width() >= dialog.media_scope.minimumSizeHint().width(),
-                    "Media choices do not fit",
+                    f"Media choices do not fit: width={dialog.media_scope.width()}, minimum={dialog.media_scope.minimumSizeHint().width()}, font={dialog.media_scope.font().toString()}",
                 )
                 dialog.reject()
                 self.stage = "done"
