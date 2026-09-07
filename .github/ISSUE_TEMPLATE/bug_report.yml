@@ -25,7 +25,7 @@ body:
     id: version
     attributes:
       label: Reelabel version
-      placeholder: "For example: 0.2.0"
+      placeholder: "For example: 0.3.0"
     validations:
       required: true
   - type: textarea

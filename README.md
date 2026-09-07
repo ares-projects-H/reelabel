@@ -14,9 +14,17 @@ movie, series, and subtitle files, as well as their containing release folders.
 It always previews proposed changes first, preserves media contents, and
 refuses ambiguous or conflicting operations.
 
-> Current release: v0.2.0.
+> Current release: v0.3.0.
 > The installers are unsigned, so begin with a copied test folder.
-> This branch previews the redesigned **0.3.0** interface; its test builds are not yet a public release.
+
+## Start by choosing a folder
+
+Drop one media folder anywhere inside the outlined welcome area, including over
+its text or button, or choose **Choose a media folder**. Dropping selects the
+folder only; Reelabel does not scan or change anything until you choose
+**Preview changes**.
+
+![Reelabel folder drop area](docs/screenshots/welcome-drop-zone.png)
 
 ## Interface preview
 

@@ -2,9 +2,9 @@
 
 Branch: `feature/modern-interface`, based on public v0.2.0 (`f85fde2`).
 The owner approved the direction in [Validation 1](README.md).
-This work is a **0.3.0 test candidate**, not a published release. Early interface
-builds displayed 0.2.0; the owner requested a distinct version after macOS validation.
-Use the version, commit and build-run manifest to identify the latest candidate.
+This work became Reelabel v0.3.0 after owner validation and explicit publication
+authorization. Early interface builds displayed 0.2.0; the owner requested a
+distinct version after macOS validation.
 
 ## User-visible changes
 
@@ -99,12 +99,12 @@ Single unprofiled passes on this Mac, local temporary files, Qt offscreen:
 These are indicative local timings, not performance guarantees for network
 shares or other hardware. Tests assert directory-read behavior, not timings.
 
-## Candidate handoff and limits
+## Release validation and limits
 
-Prepare a draft PR and run the existing installer workflow on the branch, never
-a tag. Confirm all three OS test jobs pass for the candidate commit and that the
-workflow's **Publish GitHub release** job is skipped. Keep installers under a
-separate commit-named test folder, with SHA-256 sums and build provenance.
+Before publication, the draft PR passed all three OS test jobs and the branch
+installer workflow produced five packages while **Publish GitHub release** stayed
+skipped. The downloaded candidates were kept separately with SHA-256 sums and
+their GitHub build provenance was verified.
 
 The owner must test the exact Windows 10/11 x64 EXE, macOS Apple Silicon DMG and
 Ubuntu 24.04 DEB. Intel DMG and AppImage retain automated build/startup checks;
@@ -112,7 +112,8 @@ manual testing needs matching hardware/environment. Offscreen runner success is
 not proof of native appearance, installer UX, FUSE availability, or OS warnings.
 Existing signatures, GitHub security settings, and Sponsors remain unchanged.
 
-No merge, tag, or public release is authorized by this implementation.
+The owner explicitly authorized merging and publishing v0.3.0 on September 7,
+2026, after the Mac validation and cross-platform automated checks.
 
 ## macOS feedback: welcome drop area and version
 
@@ -126,4 +127,4 @@ copied: the handler selects its path and reports a non-move drag action.
 
 Installer smoke now sends drag/drop events to the actual central widget, then
 scans and checks that Settings displays the package's single-source version.
-Version 0.3.0 distinguishes this candidate from the published 0.2.0 installers.
+Version 0.3.0 distinguishes this interface from the earlier 0.2.0 installers.
