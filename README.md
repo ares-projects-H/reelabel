@@ -14,9 +14,17 @@ movie, series, and subtitle files, as well as their containing release folders.
 It always previews proposed changes first, preserves media contents, and
 refuses ambiguous or conflicting operations.
 
-> Current release: v0.1.0.
+> Current release: v0.3.0.
 > The installers are unsigned, so begin with a copied test folder.
-> The next feature version, v0.2.0, is under development.
+
+## Start by choosing a folder
+
+Drop one media folder anywhere inside the outlined welcome area, including over
+its text or button, or choose **Choose a media folder**. Dropping selects the
+folder only; Reelabel does not scan or change anything until you choose
+**Preview changes**.
+
+![Reelabel folder drop area](docs/screenshots/welcome-drop-zone.png)
 
 ## Interface preview
 
@@ -33,13 +41,13 @@ Reelabel includes:
 - folder selection and drag-and-drop;
 - movie, series, recursion, and extras options;
 - a cancellable background scan;
-- an editable before/after preview with working Ready, Review, and Ignored filters;
+- an editable before/after preview with Ready, Review, and Ignored filters and a filename search;
 - preview columns that can be resized by dragging and sorted by clicking their
   headers;
 - native application menus and local appearance/scan-default settings;
 - an optional update check that contacts GitHub only after an explicit click;
-- proposed names that can be edited by double-clicking a cell in the
-  **Proposed name** column;
+- proposed names that can be edited by double-clicking **Proposed name**, or
+  selecting a row and choosing **Edit name** (F2);
 - editable folder-name proposals for movies, series, and other media collections;
 - optional same-folder propagation after correcting a title or season pattern
   in one episode proposal;
@@ -70,12 +78,13 @@ publisher signing without claiming that it is active today.
 ## First use in eight steps
 
 1. Open Reelabel.
-2. Drag a media folder into the window, or click **Browse**.
+2. Drop a media folder anywhere inside the outlined welcome area (or onto the
+   source panel at the top), or click **Choose folder**.
 3. Choose **All media**, **Movies only**, or **Series only**.
 4. Click **Preview changes**. No files are changed during this step.
 5. Review every row. Uncheck anything you do not want to rename.
 6. To correct a suggestion, double-click its cell in the **Proposed name**
-   column, type the new name, and press Enter.
+   column, or select a row and click **Edit name**. Type the new name and press Enter.
 7. Click **Apply selected changes** only when the preview is correct.
 8. To restore the previous names, open **History / Undo**.
 
@@ -84,7 +93,8 @@ safety warning, read the [first-time user guide](docs/user-guide.md).
 
 ## Settings
 
-On macOS, use **Reelabel → Preferences…** in the system menu bar. This opens
+Click **Settings** at the top of the window. On macOS, you can also use
+**Reelabel → Preferences…** in the system menu bar. This opens
 the **Reelabel Settings** screen. On Windows and Linux, use
 **File → Settings…** in the application window.
 
@@ -97,6 +107,9 @@ Settings remain local and cannot enable analytics, background networking, or
 automatic updates. **Help → Check for Updates…** and the button in Settings
 contact the official GitHub release page only when clicked. Reelabel never
 downloads or installs an update automatically. See the [privacy policy](PRIVACY.md).
+
+Appearance changes preview immediately; **Cancel** restores the saved appearance.
+**System** follows your desktop's appearance changes where the platform reports them.
 
 ## Run from source for development
 

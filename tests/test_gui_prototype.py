@@ -15,14 +15,14 @@ if PYSIDE_AVAILABLE:
     from PySide6.QtWidgets import QApplication, QHeaderView, QLabel, QMessageBox
 
     from reelabel import __version__, api, updates
-    from reelabel.gui.main_window import DEMO_ROWS, KIND_ROLE, MainWindow
+    from reelabel.gui.main_window import DEMO_ROWS, MainWindow
     from reelabel.gui.settings import (
         SettingsDialog,
         SettingsValues,
         load_settings,
         save_settings,
     )
-    from reelabel.gui.styles import stylesheet
+    from reelabel.gui.styles import colors, stylesheet
 
 
 @unittest.skipUnless(PYSIDE_AVAILABLE, "PySide6 is not installed")
@@ -74,24 +74,25 @@ class GuiPrototypeTests(unittest.TestCase):
         self.assertNotIn("Inter", stylesheet())
 
     def test_header_dividers_are_visible_in_both_themes(self) -> None:
-        self.assertIn("border-right: 1px solid #435476;", stylesheet(dark=True))
-        self.assertIn("border-right: 1px solid #b6c3d6;", stylesheet(dark=False))
+        self.assertIn(f"border-right: 1px solid {colors(True)['divider']};", stylesheet(dark=True))
+        self.assertIn(f"border-right: 1px solid {colors(False)['divider']};", stylesheet(dark=False))
 
     def test_popup_controls_have_explicit_colors_in_both_themes(self) -> None:
         for dark in (False, True):
             theme = stylesheet(dark=dark)
             self.assertIn("QComboBox QAbstractItemView {", theme)
-            self.assertIn("selection-color: #07101d;", theme)
+            self.assertIn(f"selection-color: {colors(dark)['on_accent']};", theme)
             self.assertIn("QToolTip {", theme)
-            self.assertIn("QScrollBar:vertical, QScrollBar:horizontal {", theme)
+            self.assertIn("QScrollBar:vertical {", theme)
             self.assertIn("QListWidget {", theme)
             self.assertIn("QListWidget::item:disabled {", theme)
 
     def test_settings_dropdowns_fit_their_complete_labels(self) -> None:
         dialog = SettingsDialog(SettingsValues())
-        self.assertGreaterEqual(dialog.minimumWidth(), 560)
-        self.assertGreaterEqual(dialog.minimumHeight(), 680)
-        for combo in (dialog.appearance, dialog.media_scope):
+        self.assertGreaterEqual(dialog.minimumWidth(), 550)
+        self.assertLessEqual(dialog.minimumHeight(), 450)
+        self.assertEqual(set(dialog.appearance_buttons), {"system", "light", "dark"})
+        for combo in (dialog.media_scope,):
             widest_label = max(
                 combo.fontMetrics().horizontalAdvance(combo.itemText(index))
                 for index in range(combo.count())
@@ -269,12 +270,12 @@ def test_manual_update_button_runs_worker_and_reports_result(qtbot, monkeypatch)
         assert window.check_updates_action.isEnabled()
         shown.append((update_result, parent))
 
-    monkeypatch.setattr(window, "_show_update_result", record_result)
+    monkeypatch.setattr(window.update_controller, "show_result", record_result)
 
     assert calls == []
     dialog.check_updates_button.click()
     qtbot.waitUntil(
-        lambda: window._update_thread is None and bool(shown),
+        lambda: window.update_controller.thread is None and bool(shown),
         timeout=3000,
     )
 
@@ -306,22 +307,22 @@ def test_help_update_action_starts_without_treating_checked_as_settings(
     qtbot.addWidget(window)
     shown: list[tuple[updates.UpdateCheckResult, object]] = []
     monkeypatch.setattr(
-        window,
-        "_show_update_result",
+        window.update_controller,
+        "show_result",
         lambda update_result, parent=None: shown.append((update_result, parent)),
     )
 
     window.check_updates_action.trigger()
-    assert window._update_notice_before_check is not None
-    assert window.notice.text() == "↻ Checking the official GitHub release…"
+    assert not window.workspace.update_activity.isHidden()
+    assert window.workspace.update_activity.text() == "Checking for updates…"
     qtbot.waitUntil(
-        lambda: window._update_thread is None and bool(shown),
+        lambda: window.update_controller.thread is None and bool(shown),
         timeout=3000,
     )
 
     assert calls == [True]
     assert shown == [(result, None)]
-    assert window._update_notice_before_check is None
+    assert window.workspace.update_activity.isHidden()
     assert window.check_updates_action.isEnabled()
 
 
@@ -380,10 +381,10 @@ def test_failed_update_check_restores_button_and_shows_error(qtbot, monkeypatch)
         assert window.check_updates_action.isEnabled()
         shown.append((reason, parent))
 
-    monkeypatch.setattr(window, "_show_update_failure", record_failure)
+    monkeypatch.setattr(window.update_controller, "show_failure", record_failure)
     dialog.check_updates_button.click()
     qtbot.waitUntil(
-        lambda: window._update_thread is None and bool(shown),
+        lambda: window.update_controller.thread is None and bool(shown),
         timeout=3000,
     )
 
@@ -398,12 +399,12 @@ def test_update_result_messages_cover_current_and_newer_builds(qtbot, monkeypatc
     qtbot.addWidget(window)
     messages: list[tuple[str, str]] = []
     monkeypatch.setattr(
-        window,
-        "_show_update_information",
+        window.update_controller,
+        "show_information",
         lambda parent, title, text: messages.append((title, text)),
     )
 
-    window._show_update_result(
+    window.update_controller.show_result(
         updates.UpdateCheckResult(
             current_version="0.2.0",
             latest_version="0.2.0",
@@ -411,7 +412,7 @@ def test_update_result_messages_cover_current_and_newer_builds(qtbot, monkeypatc
             release_url="https://github.com/ares-projects-H/reelabel/releases/tag/v0.2.0",
         )
     )
-    window._show_update_result(
+    window.update_controller.show_result(
         updates.UpdateCheckResult(
             current_version="0.2.0",
             latest_version="0.1.0",
@@ -605,9 +606,8 @@ def test_hiding_apply_reminder_does_not_hide_sidecar_warning(
     window.current_report = report
     window._populate_report(report)
 
-    for row in range(window.table.rowCount()):
-        if window.table.item(row, 1).data(KIND_ROLE) == "sidecar":
-            window.table.item(row, 0).setCheckState(Qt.CheckState.Checked)
+    assert window.related_list.count() == 1
+    window.related_list.item(0).setCheckState(Qt.CheckState.Checked)
 
     confirmations: list[tuple[str, str, str, str]] = []
     monkeypatch.setattr(

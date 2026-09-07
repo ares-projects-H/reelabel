@@ -174,6 +174,9 @@ def validate_edits(
     selected_sources = {_absolute_path(Path(source)) for source in edits}
     issues: list[ValidationIssue] = []
     destinations: dict[str, list[Path]] = defaultdict(list)
+    # Cache only this validation pass. Apply invokes validation again, so a
+    # file created after Preview is never hidden by a stale directory index.
+    siblings_by_parent: dict[Path, dict[str, list[Path]] | OSError] = {}
 
     for raw_source, raw_name in edits.items():
         source = _absolute_path(Path(raw_source))
@@ -204,6 +207,9 @@ def validate_edits(
             issues.append(
                 ValidationIssue(source, "The filename contains a path or an unsupported character.")
             )
+            # with_name() raises for paths; report the edit instead of allowing
+            # malformed text to escape a Qt itemChanged callback.
+            continue
         if name.endswith((" ", ".")):
             issues.append(
                 ValidationIssue(source, "Windows filenames cannot end with a space or period.")
@@ -215,9 +221,7 @@ def validate_edits(
             and Path(name).suffix.casefold() != source.suffix.casefold()
         ):
             issues.append(ValidationIssue(source, "The original file extension must be preserved."))
-        reserved_base = (
-            name.split(".", 1)[0] if is_directory else Path(name).stem
-        )
+        reserved_base = name.split(".", 1)[0]
         if reserved_base.rstrip(" .").upper() in WINDOWS_RESERVED:
             issues.append(ValidationIssue(source, "This filename is reserved by Windows."))
 
@@ -242,10 +246,21 @@ def validate_edits(
             issues.append(ValidationIssue(source, "A file already exists at the destination."))
         else:
             try:
+                if source.parent not in siblings_by_parent:
+                    entries: dict[str, list[Path]] = defaultdict(list)
+                    try:
+                        for sibling in source.parent.iterdir():
+                            entries[sibling.name.casefold()].append(sibling)
+                    except OSError as exc:
+                        siblings_by_parent[source.parent] = exc
+                    else:
+                        siblings_by_parent[source.parent] = entries
+                indexed = siblings_by_parent[source.parent]
+                if isinstance(indexed, OSError):
+                    raise indexed
                 sibling_collision = any(
-                    sibling.name.casefold() == name.casefold()
-                    and _absolute_path(sibling) not in selected_sources
-                    for sibling in source.parent.iterdir()
+                    _absolute_path(sibling) not in selected_sources
+                    for sibling in indexed.get(name.casefold(), ())
                 )
             except OSError as exc:
                 issues.append(ValidationIssue(source, f"The folder cannot be checked: {exc}"))
